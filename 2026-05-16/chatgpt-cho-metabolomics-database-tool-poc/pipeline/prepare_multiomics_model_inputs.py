@@ -74,18 +74,37 @@ def write_escher_reaction_data(constraints: pd.DataFrame, outdir: Path) -> None:
         json.dumps(reaction_data, indent=2),
         encoding="utf-8",
     )
+    if "passage_or_clone" in constraints.columns:
+        clone_dir = outdir / "escher_by_clone"
+        clone_dir.mkdir(parents=True, exist_ok=True)
+        clone_source = constraints.dropna(subset=["model_exchange_reaction_id", "measured_flux"])
+        for clone, sub in clone_source.groupby("passage_or_clone"):
+            clone_safe = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in str(clone))
+            clone_grouped = (
+                sub.groupby("model_exchange_reaction_id", dropna=False)["measured_flux"]
+                .mean()
+                .reset_index()
+                .rename(columns={"model_exchange_reaction_id": "reaction_id", "measured_flux": "mean_flux"})
+            )
+            clone_grouped.to_csv(clone_dir / f"{clone_safe}_reaction_data.csv", index=False)
+            clone_data = dict(zip(clone_grouped["reaction_id"], clone_grouped["mean_flux"].astype(float)))
+            (clone_dir / f"{clone_safe}_reaction_data.json").write_text(
+                json.dumps(clone_data, indent=2),
+                encoding="utf-8",
+            )
     html = """<!doctype html>
 <html>
 <head><meta charset="utf-8"><title>Escher overlay instructions</title></head>
 <body style="font-family:Arial,sans-serif;max-width:880px;margin:40px auto;line-height:1.5">
 <h1>iCHO3K Escher overlay data</h1>
-<p>This folder contains <code>escher_reaction_data_mean_flux.json</code> and
-<code>escher_reaction_data_mean_flux.csv</code>. Use the JSON as reaction data
-in Escher or Escher Builder with an iCHO3K-compatible map.</p>
+<p>This folder contains <code>escher_reaction_data_mean_flux.json</code>,
+<code>escher_reaction_data_mean_flux.csv</code>, and clone-specific files under
+<code>escher_by_clone/</code>. Use the JSON as reaction data in Escher or Escher
+Builder with an iCHO3K-compatible map.</p>
 <ol>
 <li>Open Escher Builder in the Python/conda environment that has <code>escher</code>.</li>
 <li>Load or build an iCHO3K map for central carbon / amino acid exchange reactions.</li>
-<li>Load <code>escher_reaction_data_mean_flux.json</code> as reaction data.</li>
+<li>Load <code>escher_reaction_data_mean_flux.json</code> or a clone-specific JSON as reaction data.</li>
 </ol>
 <p>Sign convention follows COBRA exchange flux: uptake is negative, secretion is positive.</p>
 </body>

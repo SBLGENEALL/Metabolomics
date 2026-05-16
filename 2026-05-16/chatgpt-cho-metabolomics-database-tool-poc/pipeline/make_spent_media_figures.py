@@ -52,6 +52,53 @@ def write_svg(path: Path, width: int, height: int, body: list[str]):
     path.write_text("\n".join(svg), encoding="utf-8")
 
 
+def write_html_report(figdir: Path) -> None:
+    figures = [
+        ("A. Spent-media time-course", "figure_A_time_course.svg"),
+        ("B. Endpoint contrast", "figure_B_endpoint_contrast.svg"),
+        ("C. Mean log2 change heatmap", "figure_C_log2_change_heatmap.svg"),
+        ("D. qMet heatmap", "figure_D_qmet_heatmap.svg"),
+        ("E. Dominant exchange fluxes", "figure_E_dominant_exchange_fluxes.svg"),
+        ("F. Culture profile", "figure_F_culture_profile.svg"),
+    ]
+    cards = []
+    for title, filename in figures:
+        if (figdir / filename).exists():
+            cards.append(
+                f"""
+<section class="figure-card">
+  <h2>{title}</h2>
+  <div class="figure-wrap"><img src="{filename}" alt="{title}"></div>
+</section>"""
+            )
+    html = f"""<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CHO Metabolomics Figure Report</title>
+  <style>
+    body {{ font-family: Arial, sans-serif; margin: 28px; color: #111827; background: #F8FAFC; }}
+    h1 {{ margin: 0 0 8px; font-size: 24px; }}
+    .note {{ color: #475569; margin-bottom: 24px; }}
+    .grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(520px, 1fr)); gap: 18px; }}
+    .figure-card {{ background: white; border: 1px solid #CBD5E1; padding: 16px; }}
+    .figure-card h2 {{ margin: 0 0 12px; font-size: 15px; color: #1F2937; }}
+    .figure-wrap {{ overflow: auto; border: 1px solid #E5E7EB; background: white; }}
+    .figure-wrap img {{ max-width: none; width: 100%; min-width: 720px; display: block; }}
+  </style>
+</head>
+<body>
+  <h1>CHO Metabolomics Figure Report</h1>
+  <div class="note">HTML version keeps each SVG in a scrollable panel, which is easier to inspect when labels are dense.</div>
+  <div class="grid">
+    {''.join(cards)}
+  </div>
+</body>
+</html>
+"""
+    (figdir / "figure_report.html").write_text(html, encoding="utf-8")
+
+
 def line_plot(long_df: pd.DataFrame, output: Path, metabolites: list[str]):
     metabolites = [m for m in metabolites if m in set(long_df["metabolite"])]
     if not metabolites:
@@ -338,6 +385,7 @@ def main():
     qmet_heatmap(rates, figdir / "figure_D_qmet_heatmap.svg")
     qmet_bar(rates, figdir / "figure_E_dominant_exchange_fluxes.svg")
     culture_profile(long_df, figdir / "figure_F_culture_profile.svg")
+    write_html_report(figdir)
     print(f"Wrote figures to {figdir}")
 
 

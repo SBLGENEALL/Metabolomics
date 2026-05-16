@@ -40,6 +40,8 @@ The pipeline writes publication-style SVG files to `results/interactive_run/figu
 - `figure_D_qmet_heatmap.svg`: clone-level uptake/secretion heatmap
 - `figure_E_dominant_exchange_fluxes.svg`: dominant qMet bar plot
 - `figure_F_culture_profile.svg`: VCD, viability, and titer profiles
+- `figure_report.html`: scrollable HTML report that is easier to inspect when
+  SVG labels are dense
 
 SVG files can be opened in a browser, PowerPoint, Illustrator, or Inkscape.
 
@@ -51,10 +53,18 @@ The model-input step writes Escher-compatible reaction data to
 - `escher_reaction_data_mean_flux.json`
 - `escher_reaction_data_mean_flux.csv`
 - `escher_overlay_instructions.html`
+- `escher_flux_overlay.html` if COBRApy and Escher are installed
+- `escher_by_clone/*_reaction_data.json`: clone-specific Escher reaction data
 
 Use the JSON as reaction data in Escher Builder with an iCHO3K-compatible map.
 The sign convention follows COBRA exchange flux: uptake is negative and
 secretion is positive.
+
+If you have an iCHO3K Escher map JSON, pass it directly:
+
+```powershell
+python pipeline/build_escher_overlay.py --map-json path/to/icho3k_map.json --reaction-data results/interactive_run/icho3k_inputs/escher_by_clone/CloneA_reaction_data.json --output results/interactive_run/icho3k_inputs/CloneA_escher.html
+```
 
 ## iCHO3K model
 

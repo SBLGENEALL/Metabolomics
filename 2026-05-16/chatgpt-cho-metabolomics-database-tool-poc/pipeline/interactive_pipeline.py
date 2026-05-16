@@ -158,6 +158,16 @@ def main() -> None:
         *transcript_args,
     ])
     print_csv_preview(args.outdir / "icho3k_inputs" / "icho_exchange_constraints.csv")
+
+    print("\nSTEP 4b. Build optional Escher overlay HTML")
+    run_cmd([
+        sys.executable,
+        "pipeline/build_escher_overlay.py",
+        "--reaction-data",
+        str(args.outdir / "icho3k_inputs" / "escher_reaction_data_mean_flux.json"),
+        "--output",
+        str(args.outdir / "icho3k_inputs" / "escher_flux_overlay.html"),
+    ])
     wait(interactive)
 
     print("\nSTEP 5. Optional COBRApy FBA")
