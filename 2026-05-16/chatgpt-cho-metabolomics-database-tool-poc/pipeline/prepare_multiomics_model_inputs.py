@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import json
 
 import numpy as np
 import pandas as pd
@@ -42,6 +43,7 @@ def make_exchange_constraints(rates: pd.DataFrame, mapping: pd.DataFrame) -> pd.
     )
     cols = [
         "passage_or_clone",
+        "producer_group",
         "replicate",
         "day_start",
         "day_end",
@@ -53,7 +55,43 @@ def make_exchange_constraints(rates: pd.DataFrame, mapping: pd.DataFrame) -> pd.
         "unit",
         "notes",
     ]
-    return merged[cols]
+    return merged[[c for c in cols if c in merged.columns]]
+
+
+def write_escher_reaction_data(constraints: pd.DataFrame, outdir: Path) -> None:
+    if constraints.empty or "model_exchange_reaction_id" not in constraints.columns:
+        return
+    grouped = (
+        constraints.dropna(subset=["model_exchange_reaction_id", "measured_flux"])
+        .groupby("model_exchange_reaction_id", dropna=False)["measured_flux"]
+        .mean()
+        .reset_index()
+        .rename(columns={"model_exchange_reaction_id": "reaction_id", "measured_flux": "mean_flux"})
+    )
+    grouped.to_csv(outdir / "escher_reaction_data_mean_flux.csv", index=False)
+    reaction_data = dict(zip(grouped["reaction_id"], grouped["mean_flux"].astype(float)))
+    (outdir / "escher_reaction_data_mean_flux.json").write_text(
+        json.dumps(reaction_data, indent=2),
+        encoding="utf-8",
+    )
+    html = """<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Escher overlay instructions</title></head>
+<body style="font-family:Arial,sans-serif;max-width:880px;margin:40px auto;line-height:1.5">
+<h1>iCHO3K Escher overlay data</h1>
+<p>This folder contains <code>escher_reaction_data_mean_flux.json</code> and
+<code>escher_reaction_data_mean_flux.csv</code>. Use the JSON as reaction data
+in Escher or Escher Builder with an iCHO3K-compatible map.</p>
+<ol>
+<li>Open Escher Builder in the Python/conda environment that has <code>escher</code>.</li>
+<li>Load or build an iCHO3K map for central carbon / amino acid exchange reactions.</li>
+<li>Load <code>escher_reaction_data_mean_flux.json</code> as reaction data.</li>
+</ol>
+<p>Sign convention follows COBRA exchange flux: uptake is negative, secretion is positive.</p>
+</body>
+</html>
+"""
+    (outdir / "escher_overlay_instructions.html").write_text(html, encoding="utf-8")
 
 
 def make_reaction_scores(transcriptomics: pd.DataFrame, gpr: pd.DataFrame) -> pd.DataFrame:
@@ -95,6 +133,7 @@ def main() -> None:
     exchange_map = pd.read_csv(args.exchange_map)
     constraints = make_exchange_constraints(rates, exchange_map)
     constraints.to_csv(args.outdir / "icho_exchange_constraints.csv", index=False)
+    write_escher_reaction_data(constraints, args.outdir)
 
     if args.transcriptomics and args.gpr_map:
         transcriptomics = pd.read_csv(args.transcriptomics)

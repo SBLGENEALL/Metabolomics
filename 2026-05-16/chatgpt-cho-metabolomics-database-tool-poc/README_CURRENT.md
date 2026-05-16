@@ -30,6 +30,32 @@ The runner creates:
 - `results/interactive_run/icho3k_inputs`
 - `results/interactive_run/fba` if COBRApy is available
 
+## Figures
+
+The pipeline writes publication-style SVG files to `results/interactive_run/figures`:
+
+- `figure_A_time_course.svg`: spent-media time-course profiles
+- `figure_B_endpoint_contrast.svg`: selected group contrast
+- `figure_C_log2_change_heatmap.svg`: mean log2 change heatmap
+- `figure_D_qmet_heatmap.svg`: clone-level uptake/secretion heatmap
+- `figure_E_dominant_exchange_fluxes.svg`: dominant qMet bar plot
+- `figure_F_culture_profile.svg`: VCD, viability, and titer profiles
+
+SVG files can be opened in a browser, PowerPoint, Illustrator, or Inkscape.
+
+## Escher Overlay
+
+The model-input step writes Escher-compatible reaction data to
+`results/interactive_run/icho3k_inputs`:
+
+- `escher_reaction_data_mean_flux.json`
+- `escher_reaction_data_mean_flux.csv`
+- `escher_overlay_instructions.html`
+
+Use the JSON as reaction data in Escher Builder with an iCHO3K-compatible map.
+The sign convention follows COBRA exchange flux: uptake is negative and
+secretion is positive.
+
 ## iCHO3K model
 
 The workflow uses the local production model:

@@ -127,6 +127,7 @@ def interval_rates(delta_df: pd.DataFrame) -> pd.DataFrame:
                 {
                     "passage_or_clone": keys[0],
                     "replicate": keys[1],
+                    "producer_group": curr.get("producer_group", prev.get("producer_group", "")),
                     "metabolite": keys[2],
                     "day_start": prev["day"],
                     "day_end": curr["day"],
