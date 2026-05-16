@@ -1,0 +1,27 @@
+# Node / package manager
+node_modules/
+.pnpm-store/
+dist/
+build/
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
+!models/iCHO3K/env/
+!models/iCHO3K/env/**
+
+# Data / results
+outputs/
+results/
+archive/
+inputs/*
+!inputs/.gitkeep
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
