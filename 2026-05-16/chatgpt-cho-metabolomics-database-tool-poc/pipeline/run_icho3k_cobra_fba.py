@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 """Run a minimal COBRApy FBA workflow on local iCHO3K.
 
-Run this inside the iCHO3K environment, not the bundled Codex runtime:
+Run this inside the iCHO3K environment, not the bundled Codex runtime.
+Use forward slashes in example paths so Python docstrings do not interpret
+Windows backslashes as escape sequences:
 
-conda env create -f C:\CHO_FBA\model\iCHO3K-main\environment.yml
+conda env create -f models/iCHO3K/env/environment.yml
 conda activate icho3k
 python pipeline/run_icho3k_cobra_fba.py --constraints outputs/multiomics_model_inputs_icho3k_verified/icho_exchange_constraints.csv --outdir outputs/icho3k_fba
 
