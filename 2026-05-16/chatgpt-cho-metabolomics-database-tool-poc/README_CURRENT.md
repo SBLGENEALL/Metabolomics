@@ -21,6 +21,12 @@ For explicit group comparison, for example Mother versus High:
 python pipeline/interactive_pipeline.py --reference-group Mother --compare-group High
 ```
 
+If FVA is too slow on a large company dataset, run FBA first and skip FVA:
+
+```powershell
+python pipeline/interactive_pipeline.py --skip-fva
+```
+
 You can use any `producer_group` labels in the input sheet, such as `Mother`, `Low`, `Moderate`, and `High`.
 
 The runner creates:
@@ -29,6 +35,13 @@ The runner creates:
 - `results/interactive_run/figures`
 - `results/interactive_run/icho3k_inputs`
 - `results/interactive_run/fba` if COBRApy is available
+
+FBA/FVA output includes:
+
+- `fba_objective_results_by_scenario.csv`: predicted growth and IgG objective values for each clone/group/time interval
+- `fba_selected_fluxes_by_scenario.csv`: model-inferred fluxes for core exchange, biomass, and IgG reactions
+- `fva_selected_reactions_by_scenario.csv`: flux variability ranges for selected reactions, showing which fluxes are tightly constrained versus flexible
+- `fba_fva_report.html`: browser-friendly summary tables
 
 ## Figures
 

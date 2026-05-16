@@ -101,6 +101,7 @@ def main() -> None:
     parser.add_argument("--compare-group", help="Comparison group for endpoint contrast, e.g. High")
     parser.add_argument("--non-interactive", action="store_true")
     parser.add_argument("--skip-fba", action="store_true")
+    parser.add_argument("--skip-fva", action="store_true", help="Run FBA but skip slower FVA range analysis")
     args = parser.parse_args()
 
     interactive = not args.non_interactive
@@ -178,14 +179,17 @@ def main() -> None:
         print("After packaging cobra/libsbml/glpk, rerun this script or run:")
         print("python pipeline/run_icho3k_cobra_fba.py --constraints results/interactive_run/icho3k_inputs/icho_exchange_constraints.csv --outdir results/interactive_run/fba")
     else:
-        run_cmd([
+        fba_cmd = [
             sys.executable,
             "pipeline/run_icho3k_cobra_fba.py",
             "--constraints",
             str(args.outdir / "icho3k_inputs" / "icho_exchange_constraints.csv"),
             "--outdir",
             str(args.outdir / "fba"),
-        ])
+        ]
+        if args.skip_fva:
+            fba_cmd.append("--skip-fva")
+        run_cmd(fba_cmd)
         print_csv_preview(args.outdir / "fba" / "fba_objective_results.csv")
 
     print("\nDone.")
