@@ -138,7 +138,11 @@ def interval_rates(delta_df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-def endpoint_contrast(delta_df: pd.DataFrame) -> pd.DataFrame:
+def endpoint_contrast(
+    delta_df: pd.DataFrame,
+    reference_group: str | None = None,
+    compare_group: str | None = None,
+) -> pd.DataFrame:
     endpoint = (
         delta_df.sort_values("day")
         .groupby(["passage_or_clone", "replicate", "metabolite"], dropna=False)
@@ -156,9 +160,16 @@ def endpoint_contrast(delta_df: pd.DataFrame) -> pd.DataFrame:
         .reset_index()
     )
 
-    groups = sorted(endpoint["producer_group"].dropna().unique())
+    groups = sorted(endpoint["producer_group"].dropna().astype(str).unique())
     if len(groups) >= 2:
-        ref, comp = groups[0], groups[-1]
+        ref = reference_group or groups[0]
+        comp = compare_group or groups[-1]
+        missing_groups = [g for g in [ref, comp] if g not in groups]
+        if missing_groups:
+            raise ValueError(
+                f"Requested group(s) not found: {missing_groups}. "
+                f"Available producer_group values: {groups}"
+            )
         pivot = summary.pivot(index="metabolite", columns="producer_group", values="log2_ratio_mean")
         contrast = pd.DataFrame(index=pivot.index)
         contrast[f"log2_ratio_mean_{ref}"] = pivot.get(ref)
@@ -211,6 +222,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--outdir", required=True, type=Path)
+    parser.add_argument("--reference-group", help="Baseline group for endpoint contrast, e.g. Mother")
+    parser.add_argument("--compare-group", help="Comparison group for endpoint contrast, e.g. High")
     args = parser.parse_args()
     args.outdir.mkdir(parents=True, exist_ok=True)
 
@@ -218,7 +231,7 @@ def main() -> None:
     qc = summarize_qc(long_df)
     delta = baseline_delta(long_df)
     rates = interval_rates(delta)
-    summary, contrast = endpoint_contrast(delta)
+    summary, contrast = endpoint_contrast(delta, args.reference_group, args.compare_group)
     pathways = pathway_rollup(contrast)
 
     long_df.to_csv(args.outdir / "01_long_input.csv", index=False)

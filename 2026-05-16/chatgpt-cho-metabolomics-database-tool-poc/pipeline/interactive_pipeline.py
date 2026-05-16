@@ -97,6 +97,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=Path, default=DEFAULT_INPUT)
     parser.add_argument("--outdir", type=Path, default=DEFAULT_OUTDIR)
+    parser.add_argument("--reference-group", help="Baseline group for endpoint contrast, e.g. Mother")
+    parser.add_argument("--compare-group", help="Comparison group for endpoint contrast, e.g. High")
     parser.add_argument("--non-interactive", action="store_true")
     parser.add_argument("--skip-fba", action="store_true")
     args = parser.parse_args()
@@ -112,14 +114,19 @@ def main() -> None:
     wait(interactive)
 
     print("\nSTEP 2. Calculate spent-media deltas and uptake/secretion rates")
-    run_cmd([
+    spent_media_cmd = [
         sys.executable,
         "pipeline/spent_media_minimal_pipeline.py",
         "--input",
         str(args.input),
         "--outdir",
         str(args.outdir / "spent_media"),
-    ])
+    ]
+    if args.reference_group:
+        spent_media_cmd.extend(["--reference-group", args.reference_group])
+    if args.compare_group:
+        spent_media_cmd.extend(["--compare-group", args.compare_group])
+    run_cmd(spent_media_cmd)
     print_csv_preview(args.outdir / "spent_media" / "04_interval_rates.csv")
     wait(interactive)
 

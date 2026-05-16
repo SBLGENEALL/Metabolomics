@@ -15,6 +15,14 @@ Use these files for the real experiment workflow.
 python pipeline/interactive_pipeline.py
 ```
 
+For explicit group comparison, for example Mother versus High:
+
+```powershell
+python pipeline/interactive_pipeline.py --reference-group Mother --compare-group High
+```
+
+You can use any `producer_group` labels in the input sheet, such as `Mother`, `Low`, `Moderate`, and `High`.
+
 The runner creates:
 
 - `results/interactive_run/spent_media`
