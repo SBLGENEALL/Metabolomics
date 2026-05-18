@@ -120,20 +120,48 @@ def optimize_objective(model, objective_id: str) -> tuple[str, float | None, obj
     return sol.status, value, sol
 
 
-def selected_fluxes(model, solution, scenario: dict, objective: str, reaction_ids: list[str]) -> list[dict]:
+def reaction_class(reaction_id: str) -> str:
+    if reaction_id.startswith("EX_"):
+        return "exchange_media"
+    if reaction_id.startswith("DM_"):
+        return "demand_sink"
+    if "igg" in reaction_id.lower():
+        return "antibody_product"
+    return "internal_network"
+
+
+def reaction_metadata(model, reaction_id: str) -> dict:
+    rxn = model.reactions.get_by_id(reaction_id)
+    return {
+        "reaction_id": reaction_id,
+        "reaction_name": rxn.name,
+        "reaction_class": reaction_class(reaction_id),
+        "subsystem": getattr(rxn, "subsystem", ""),
+        "lower_bound": rxn.lower_bound,
+        "upper_bound": rxn.upper_bound,
+        "reaction_equation": rxn.reaction,
+    }
+
+
+def reaction_fluxes(model, solution, scenario: dict, objective: str, reaction_ids: list[str]) -> list[dict]:
     rows = []
     if solution is None or solution.status != "optimal":
         return rows
     for rid in reaction_ids:
         if rid not in model.reactions:
             continue
+        reduced_cost = math.nan
+        if hasattr(solution, "reduced_costs"):
+            reduced_cost = float(solution.reduced_costs.get(rid, math.nan))
         rows.append(
             {
                 **scenario,
                 "objective": objective,
-                "reaction_id": rid,
-                "reaction_name": model.reactions.get_by_id(rid).name,
+                "objective_value": solution.objective_value,
+                **reaction_metadata(model, rid),
                 "flux": float(solution.fluxes.get(rid, math.nan)),
+                "abs_flux": abs(float(solution.fluxes.get(rid, math.nan))),
+                "reduced_cost": reduced_cost,
             }
         )
     return rows
@@ -153,17 +181,115 @@ def run_fva(model, scenario: dict, reaction_ids: list[str]) -> list[dict]:
         rows.append(
             {
                 **scenario,
-                "reaction_id": rid,
-                "reaction_name": model.reactions.get_by_id(rid).name,
+                **reaction_metadata(model, rid),
                 "minimum": row["minimum"],
                 "maximum": row["maximum"],
                 "range": row["maximum"] - row["minimum"],
+                "abs_range": abs(row["maximum"] - row["minimum"]),
+                "is_fixed_or_tight": abs(row["maximum"] - row["minimum"]) < 1e-9,
             }
         )
     return rows
 
 
-def write_fba_figures(outdir: Path, objective_df: pd.DataFrame, flux_df: pd.DataFrame, fva_df: pd.DataFrame) -> None:
+def write_flux_differences(
+    outdir: Path,
+    all_flux_df: pd.DataFrame,
+    reference_group: str | None,
+    compare_group: str | None,
+) -> pd.DataFrame:
+    if (
+        all_flux_df.empty
+        or not reference_group
+        or not compare_group
+        or "producer_group" not in all_flux_df.columns
+    ):
+        return pd.DataFrame()
+    sub = all_flux_df[all_flux_df["producer_group"].astype(str).isin([reference_group, compare_group])].copy()
+    if sub.empty:
+        return pd.DataFrame()
+    keys = ["objective", "reaction_id", "reaction_name", "reaction_class", "subsystem", "reaction_equation"]
+    means = sub.groupby(["producer_group", *keys], dropna=False)["flux"].mean().reset_index()
+    pivot = means.pivot_table(index=keys, columns="producer_group", values="flux", aggfunc="mean").reset_index()
+    if reference_group not in pivot.columns or compare_group not in pivot.columns:
+        return pd.DataFrame()
+    pivot["reference_group"] = reference_group
+    pivot["compare_group"] = compare_group
+    pivot["flux_reference"] = pivot[reference_group]
+    pivot["flux_compare"] = pivot[compare_group]
+    pivot["flux_delta_compare_minus_reference"] = pivot["flux_compare"] - pivot["flux_reference"]
+    pivot["abs_flux_delta"] = pivot["flux_delta_compare_minus_reference"].abs()
+    result = pivot.drop(columns=[reference_group, compare_group]).sort_values("abs_flux_delta", ascending=False)
+    result.to_csv(outdir / "fba_flux_differences_by_group.csv", index=False)
+
+    design = result[result["objective"].isin(["DM_igg_g", "igg_formation"])].copy()
+    design["design_hint"] = design["reaction_class"].map(
+        {
+            "exchange_media": "media/feed candidate",
+            "demand_sink": "product sink/objective check",
+            "antibody_product": "IgG synthesis/assembly candidate",
+            "internal_network": "intracellular pathway candidate",
+        }
+    ).fillna("model candidate")
+    design.head(300).to_csv(outdir / "fba_flux_design_candidates.csv", index=False)
+    return result
+
+
+def write_fva_summary(outdir: Path, fva_df: pd.DataFrame) -> None:
+    if fva_df.empty:
+        return
+    summary = (
+        fva_df.groupby(["reaction_id", "reaction_name", "reaction_class", "subsystem"], dropna=False)
+        .agg(
+            mean_minimum=("minimum", "mean"),
+            mean_maximum=("maximum", "mean"),
+            mean_range=("range", "mean"),
+            max_abs_range=("abs_range", "max"),
+            tight_scenario_fraction=("is_fixed_or_tight", "mean"),
+        )
+        .reset_index()
+        .sort_values(["tight_scenario_fraction", "max_abs_range"], ascending=[False, True])
+    )
+    summary.to_csv(outdir / "fva_reaction_range_summary.csv", index=False)
+
+
+def choose_fva_reactions(model, scenario_flux_rows: list[dict], scope: str, threshold: float, max_reactions: int | None) -> list[str]:
+    if scope == "all":
+        selected = [rxn.id for rxn in model.reactions]
+    elif scope == "active":
+        selected = sorted(
+            {
+                row["reaction_id"]
+                for row in scenario_flux_rows
+                if abs(float(row.get("flux", 0.0))) > threshold
+            }.union(CORE_REACTIONS)
+        )
+    else:
+        selected = list(CORE_REACTIONS)
+
+    if scope == "active" and max_reactions is None:
+        max_reactions = 500
+
+    if max_reactions and len(selected) > max_reactions:
+        ranked = (
+            pd.DataFrame(scenario_flux_rows)
+            .assign(abs_flux=lambda df: df["flux"].abs())
+            .groupby("reaction_id", dropna=False)["abs_flux"]
+            .max()
+            .sort_values(ascending=False)
+        )
+        keep = list(dict.fromkeys([*CORE_REACTIONS, *ranked.index.tolist()]))
+        selected = [rid for rid in keep if rid in selected][:max_reactions]
+    return selected
+
+
+def write_fba_figures(
+    outdir: Path,
+    objective_df: pd.DataFrame,
+    selected_flux_df: pd.DataFrame,
+    fva_df: pd.DataFrame,
+    diff_df: pd.DataFrame,
+) -> None:
     html_parts = [
         "<!doctype html><html><head><meta charset='utf-8'><title>iCHO3K FBA/FVA Report</title>",
         "<style>body{font-family:Arial,sans-serif;margin:28px;background:#f8fafc;color:#111827}"
@@ -177,14 +303,18 @@ def write_fba_figures(outdir: Path, objective_df: pd.DataFrame, flux_df: pd.Data
         html_parts.append("<section><h2>Objective values by scenario</h2>")
         html_parts.append(pivot.to_html(index=False, float_format=lambda x: f"{x:.4g}"))
         html_parts.append("</section>")
-    if not flux_df.empty:
-        core = flux_df[flux_df["reaction_id"].isin(["EX_glc_e", "EX_lac_L_e", "EX_nh4_e", "EX_gln_L_e", "DM_igg_g", "igg_formation"])]
+    if not selected_flux_df.empty:
+        core = selected_flux_df[selected_flux_df["reaction_id"].isin(["EX_glc_e", "EX_lac_L_e", "EX_nh4_e", "EX_gln_L_e", "DM_igg_g", "igg_formation"])]
         html_parts.append("<section><h2>Selected fluxes</h2>")
         html_parts.append(core.head(200).to_html(index=False, float_format=lambda x: f"{x:.4g}"))
         html_parts.append("</section>")
     if not fva_df.empty:
         html_parts.append("<section><h2>FVA ranges</h2>")
         html_parts.append(fva_df.head(200).to_html(index=False, float_format=lambda x: f"{x:.4g}"))
+        html_parts.append("</section>")
+    if not diff_df.empty:
+        html_parts.append("<section><h2>Largest model-predicted flux differences</h2>")
+        html_parts.append(diff_df.head(80).to_html(index=False, float_format=lambda x: f"{x:.4g}"))
         html_parts.append("</section>")
     html_parts.append("</body></html>")
     (outdir / "fba_fva_report.html").write_text("\n".join(html_parts), encoding="utf-8")
@@ -197,7 +327,15 @@ def main() -> None:
     parser.add_argument("--outdir", required=True, type=Path)
     parser.add_argument("--condition", help="Optional passage_or_clone value to constrain one condition")
     parser.add_argument("--skip-fva", action="store_true", help="Skip FVA to make the run faster")
+    parser.add_argument("--full-fva", action="store_true", help="Run FVA on every model reaction instead of the core reaction panel")
+    parser.add_argument("--fva-scope", choices=["core", "active", "all"], default="core", help="FVA reaction set: core is fastest, active follows nonzero FBA reactions, all is full-model FVA")
+    parser.add_argument("--active-flux-threshold", type=float, default=1e-9, help="Flux threshold for --fva-scope active")
+    parser.add_argument("--fva-max-reactions", type=int, help="Optional cap for FVA reactions after ranking by absolute FBA flux; active scope defaults to 500")
+    parser.add_argument("--reference-group", help="Reference producer_group for model-predicted flux difference calculations")
+    parser.add_argument("--compare-group", help="Comparison producer_group for model-predicted flux difference calculations")
     args = parser.parse_args()
+    if args.full_fva:
+        args.fva_scope = "all"
 
     args.outdir.mkdir(parents=True, exist_ok=True)
     base_model = load_model(args.model)
@@ -208,7 +346,7 @@ def main() -> None:
     scenario_cols = scenario_columns(constraints)
     grouped = [((), constraints)] if not scenario_cols else list(constraints.groupby(scenario_cols, dropna=False))
     objective_rows = []
-    flux_rows = []
+    all_flux_rows = []
     fva_rows = []
     applied_rows = []
 
@@ -219,6 +357,7 @@ def main() -> None:
         scenario["scenario"] = scenario_label(scenario)
         model = base_model.copy()
         applied = apply_constraints(model, sub)
+        scenario_flux_rows = []
         for rid in applied:
             applied_rows.append({**scenario, "applied_exchange_reaction_id": rid})
 
@@ -226,29 +365,63 @@ def main() -> None:
             objective_model = model.copy()
             status, value, solution = optimize_objective(objective_model, objective)
             objective_rows.append({**scenario, "objective": objective, "status": status, "value": value})
-            flux_rows.extend(selected_fluxes(objective_model, solution, scenario, objective, CORE_REACTIONS))
+            rows = reaction_fluxes(
+                objective_model,
+                solution,
+                scenario,
+                objective,
+                [rxn.id for rxn in objective_model.reactions],
+            )
+            scenario_flux_rows.extend(rows)
+            all_flux_rows.extend(rows)
 
         if not args.skip_fva:
             fva_model = model.copy()
             if "DM_igg_g" in fva_model.reactions:
                 fva_model.objective = "DM_igg_g"
-            fva_rows.extend(run_fva(fva_model, scenario, CORE_REACTIONS))
+            fva_reactions = choose_fva_reactions(
+                fva_model,
+                scenario_flux_rows,
+                args.fva_scope,
+                args.active_flux_threshold,
+                args.fva_max_reactions,
+            )
+            fva_rows.extend(run_fva(fva_model, scenario, fva_reactions))
 
     objective_df = pd.DataFrame(objective_rows)
-    flux_df = pd.DataFrame(flux_rows)
+    all_flux_df = pd.DataFrame(all_flux_rows)
+    selected_flux_df = (
+        all_flux_df[all_flux_df["reaction_id"].isin(CORE_REACTIONS)].copy()
+        if not all_flux_df.empty
+        else pd.DataFrame()
+    )
     fva_df = pd.DataFrame(fva_rows)
+    selected_fva_df = (
+        fva_df[fva_df["reaction_id"].isin(CORE_REACTIONS)].copy()
+        if not fva_df.empty
+        else pd.DataFrame()
+    )
     applied_df = pd.DataFrame(applied_rows)
+    diff_df = write_flux_differences(args.outdir, all_flux_df, args.reference_group, args.compare_group)
+    write_fva_summary(args.outdir, fva_df)
 
     objective_df.to_csv(args.outdir / "fba_objective_results_by_scenario.csv", index=False)
-    flux_df.to_csv(args.outdir / "fba_selected_fluxes_by_scenario.csv", index=False)
-    fva_df.to_csv(args.outdir / "fva_selected_reactions_by_scenario.csv", index=False)
+    selected_flux_df.to_csv(args.outdir / "fba_selected_fluxes_by_scenario.csv", index=False)
+    all_flux_df.to_csv(args.outdir / "fba_all_reaction_fluxes_by_scenario.csv", index=False)
+    selected_fva_df.to_csv(args.outdir / "fva_selected_reactions_by_scenario.csv", index=False)
+    if args.fva_scope == "active":
+        fva_df.to_csv(args.outdir / "fva_active_reactions_by_scenario.csv", index=False)
+    if args.fva_scope == "all":
+        fva_df.to_csv(args.outdir / "fva_all_reactions_by_scenario.csv", index=False)
     applied_df.to_csv(args.outdir / "applied_constraints_by_scenario.csv", index=False)
-    write_fba_figures(args.outdir, objective_df, flux_df, fva_df)
+    write_fba_figures(args.outdir, objective_df, selected_flux_df, selected_fva_df, diff_df)
 
     # Keep backwards-compatible filename for older instructions.
     objective_df.to_csv(args.outdir / "fba_objective_results.csv", index=False)
     print(objective_df.head(20).to_string(index=False))
-    print(f"Ran {len(grouped)} scenario(s). Wrote FBA/FVA results to {args.outdir}")
+    print(f"Ran {len(grouped)} scenario(s). Wrote full FBA flux results to {args.outdir}")
+    if not args.skip_fva:
+        print(f"FVA scope: {args.fva_scope}. Use --fva-scope active for broad practical FVA or --fva-scope all for full-model FVA.")
 
 
 if __name__ == "__main__":

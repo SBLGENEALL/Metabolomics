@@ -102,6 +102,8 @@ def main() -> None:
     parser.add_argument("--non-interactive", action="store_true")
     parser.add_argument("--skip-fba", action="store_true")
     parser.add_argument("--skip-fva", action="store_true", help="Run FBA but skip slower FVA range analysis")
+    parser.add_argument("--fva-scope", choices=["core", "active", "all"], default="core", help="FVA reaction set; active is recommended for broad model-level analysis")
+    parser.add_argument("--full-fva", action="store_true", help="Run FVA on every iCHO3K reaction; this can be slow")
     args = parser.parse_args()
 
     interactive = not args.non_interactive
@@ -189,6 +191,13 @@ def main() -> None:
         ]
         if args.skip_fva:
             fba_cmd.append("--skip-fva")
+        fba_cmd.extend(["--fva-scope", args.fva_scope])
+        if args.full_fva:
+            fba_cmd.append("--full-fva")
+        if args.reference_group:
+            fba_cmd.extend(["--reference-group", args.reference_group])
+        if args.compare_group:
+            fba_cmd.extend(["--compare-group", args.compare_group])
         run_cmd(fba_cmd)
         print_csv_preview(args.outdir / "fba" / "fba_objective_results.csv")
 

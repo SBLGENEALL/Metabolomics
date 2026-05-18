@@ -27,6 +27,18 @@ If FVA is too slow on a large company dataset, run FBA first and skip FVA:
 python pipeline/interactive_pipeline.py --skip-fva
 ```
 
+For broader model-level FVA on the top active reactions that carry nonzero FBA flux, use:
+
+```powershell
+python pipeline/interactive_pipeline.py --reference-group Mother --compare-group High --fva-scope active
+```
+
+To calculate full-model FVA for every iCHO3K reaction, use the slower all-reaction mode:
+
+```powershell
+python pipeline/interactive_pipeline.py --reference-group Mother --compare-group High --fva-scope all
+```
+
 You can use any `producer_group` labels in the input sheet, such as `Mother`, `Low`, `Moderate`, and `High`.
 
 The runner creates:
@@ -40,7 +52,13 @@ FBA/FVA output includes:
 
 - `fba_objective_results_by_scenario.csv`: predicted growth and IgG objective values for each clone/group/time interval
 - `fba_selected_fluxes_by_scenario.csv`: model-inferred fluxes for core exchange, biomass, and IgG reactions
+- `fba_all_reaction_fluxes_by_scenario.csv`: full FBA solution for every iCHO3K reaction and objective
+- `fba_flux_differences_by_group.csv`: model-predicted flux differences between the requested reference and comparison groups
+- `fba_flux_design_candidates.csv`: high-priority flux-difference candidates for media/feed or pathway follow-up
 - `fva_selected_reactions_by_scenario.csv`: flux variability ranges for selected reactions, showing which fluxes are tightly constrained versus flexible
+- `fva_active_reactions_by_scenario.csv`: FVA for reactions with nonzero FBA flux when `--fva-scope active` is used
+- `fva_all_reactions_by_scenario.csv`: full-model FVA output when `--fva-scope all` or `--full-fva` is used
+- `fva_reaction_range_summary.csv`: average FVA flexibility/tightness by reaction
 - `fba_fva_report.html`: browser-friendly summary tables
 
 ## Figures
