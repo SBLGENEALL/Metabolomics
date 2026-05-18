@@ -7,8 +7,8 @@ Use these files for the real experiment workflow.
 - Copy `templates/CHO_actual_experiment_input_template.xlsx` to `inputs/CHO_actual_experiment_input.xlsx`.
   - Fill `Experiment_Input` with spent media concentrations, VCD, viability, titer, and optional 20 amino acids.
   - `inputs/` is git-ignored so real company data is not committed.
-- The pipeline also accepts the raw feeding workbook format with a `Paste_Raw_Data`
-  sheet, such as `CHO_raw_data_with_feeding_columns_template.xlsx`.
+- The pipeline also accepts the raw feeding workbook format with a `Paste_Raw_Data`,
+  `CHO_raw_data`, or similarly structured raw-data sheet.
   - `DAY` values like `Day5` are converted to numeric day values.
   - `Sample ID` is used as the clone/condition name.
   - `Gln`, `Glu`, `Gluc`, `Lac`, and `NH4+` are mapped to iCHO3K-ready metabolite names.
@@ -26,6 +26,13 @@ To run directly on the raw feeding workbook:
 
 ```powershell
 python pipeline/interactive_pipeline.py --input "C:\Users\j3das\Downloads\CHO_raw_data_with_feeding_columns_template.xlsx"
+```
+
+For real fed-batch workbooks with many clones/timepoints, the interactive runner
+uses compact FBA flux output by default. To save every iCHO3K reaction flux, add:
+
+```powershell
+python pipeline/interactive_pipeline.py --input "C:\path\to\CHO_raw_data.xlsx" --fba-flux-scope all
 ```
 
 For explicit group comparison, for example Mother versus High:

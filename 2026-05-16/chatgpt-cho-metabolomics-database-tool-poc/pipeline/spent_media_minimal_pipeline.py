@@ -67,6 +67,19 @@ RAW_FEED_SPECS = {
     ],
 }
 
+RAW_REQUIRED_COLUMNS = {"DAY", "Sample ID", "Gln", "Glu", "Gluc", "Lac", "NH4+"}
+
+
+def find_raw_data_sheet(path: Path) -> str | None:
+    xl = pd.ExcelFile(path)
+    if "Paste_Raw_Data" in xl.sheet_names:
+        return "Paste_Raw_Data"
+    for sheet in xl.sheet_names:
+        preview = pd.read_excel(path, sheet_name=sheet, nrows=0)
+        if RAW_REQUIRED_COLUMNS.issubset(set(preview.columns)):
+            return sheet
+    return None
+
 
 def parse_day(value) -> float:
     if pd.isna(value):
@@ -106,8 +119,8 @@ def feed_umol_for_row(row: pd.Series, metabolite: str) -> float:
     return total
 
 
-def read_raw_feeding_template(path: Path) -> pd.DataFrame:
-    raw = pd.read_excel(path, sheet_name="Paste_Raw_Data")
+def read_raw_feeding_template(path: Path, sheet_name: str = "Paste_Raw_Data") -> pd.DataFrame:
+    raw = pd.read_excel(path, sheet_name=sheet_name)
     raw = raw.dropna(how="all")
     rows = []
     for _, row in raw.iterrows():
@@ -138,7 +151,7 @@ def read_raw_feeding_template(path: Path) -> pd.DataFrame:
                     "value": row.get(raw_col),
                     "feed_umol_since_previous": feed_umol_for_row(row, metabolite),
                     "source_column": raw_col,
-                    "source_format": "Paste_Raw_Data",
+                    "source_format": sheet_name,
                 }
             )
     return pd.DataFrame(rows)
@@ -147,8 +160,9 @@ def read_raw_feeding_template(path: Path) -> pd.DataFrame:
 def read_input(path: Path) -> pd.DataFrame:
     if path.suffix.lower() in {".xlsx", ".xls"}:
         xl = pd.ExcelFile(path)
-        if "Paste_Raw_Data" in xl.sheet_names:
-            df = read_raw_feeding_template(path)
+        raw_sheet = find_raw_data_sheet(path)
+        if raw_sheet:
+            df = read_raw_feeding_template(path, raw_sheet)
             long_df = df.copy()
             sheet = None
         else:

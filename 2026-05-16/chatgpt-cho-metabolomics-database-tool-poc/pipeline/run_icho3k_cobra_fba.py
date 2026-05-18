@@ -283,6 +283,19 @@ def choose_fva_reactions(model, scenario_flux_rows: list[dict], scope: str, thre
     return selected
 
 
+def choose_flux_reactions(model, solution, scope: str, threshold: float) -> list[str]:
+    if scope == "all":
+        return [rxn.id for rxn in model.reactions]
+    if scope == "active" and solution is not None and solution.status == "optimal":
+        active = [
+            rid
+            for rid, value in solution.fluxes.items()
+            if abs(float(value)) > threshold
+        ]
+        return list(dict.fromkeys([*CORE_REACTIONS, *active]))
+    return list(CORE_REACTIONS)
+
+
 def write_fba_figures(
     outdir: Path,
     objective_df: pd.DataFrame,
@@ -331,6 +344,7 @@ def main() -> None:
     parser.add_argument("--fva-scope", choices=["core", "active", "all"], default="core", help="FVA reaction set: core is fastest, active follows nonzero FBA reactions, all is full-model FVA")
     parser.add_argument("--active-flux-threshold", type=float, default=1e-9, help="Flux threshold for --fva-scope active")
     parser.add_argument("--fva-max-reactions", type=int, help="Optional cap for FVA reactions after ranking by absolute FBA flux; active scope defaults to 500")
+    parser.add_argument("--flux-scope", choices=["selected", "active", "all"], default="all", help="FBA flux output size: selected is fastest, active saves nonzero fluxes, all saves every model reaction")
     parser.add_argument("--reference-group", help="Reference producer_group for model-predicted flux difference calculations")
     parser.add_argument("--compare-group", help="Comparison producer_group for model-predicted flux difference calculations")
     args = parser.parse_args()
@@ -362,15 +376,14 @@ def main() -> None:
             applied_rows.append({**scenario, "applied_exchange_reaction_id": rid})
 
         for objective in OBJECTIVES:
-            objective_model = model.copy()
-            status, value, solution = optimize_objective(objective_model, objective)
+            status, value, solution = optimize_objective(model, objective)
             objective_rows.append({**scenario, "objective": objective, "status": status, "value": value})
             rows = reaction_fluxes(
-                objective_model,
+                model,
                 solution,
                 scenario,
                 objective,
-                [rxn.id for rxn in objective_model.reactions],
+                choose_flux_reactions(model, solution, args.flux_scope, args.active_flux_threshold),
             )
             scenario_flux_rows.extend(rows)
             all_flux_rows.extend(rows)

@@ -77,8 +77,10 @@ def validate_input(input_path: Path) -> None:
     metabolites = sorted(df["metabolite"].dropna().astype(str).unique())
     print(f"Metabolites detected: {len(metabolites)}")
     print(", ".join(metabolites[:40]))
-    if "source_format" in df.columns and df["source_format"].eq("Paste_Raw_Data").any():
-        print("Detected raw feeding template: Paste_Raw_Data")
+    if "source_format" in df.columns:
+        source_formats = sorted(df["source_format"].dropna().astype(str).unique())
+        if source_formats:
+            print(f"Detected raw feeding template sheet: {', '.join(source_formats)}")
 
 
 def cobra_available() -> bool:
@@ -96,6 +98,7 @@ def main() -> None:
     parser.add_argument("--skip-fva", action="store_true", help="Run FBA but skip slower FVA range analysis")
     parser.add_argument("--fva-scope", choices=["core", "active", "all"], default="core", help="FVA reaction set; active is recommended for broad model-level analysis")
     parser.add_argument("--full-fva", action="store_true", help="Run FVA on every iCHO3K reaction; this can be slow")
+    parser.add_argument("--fba-flux-scope", choices=["selected", "active", "all"], default="selected", help="FBA flux output size; selected is recommended for routine full-pipeline runs")
     args = parser.parse_args()
 
     interactive = not args.non_interactive
@@ -183,6 +186,7 @@ def main() -> None:
         ]
         if args.skip_fva:
             fba_cmd.append("--skip-fva")
+        fba_cmd.extend(["--flux-scope", args.fba_flux_scope])
         fba_cmd.extend(["--fva-scope", args.fva_scope])
         if args.full_fva:
             fba_cmd.append("--full-fva")
