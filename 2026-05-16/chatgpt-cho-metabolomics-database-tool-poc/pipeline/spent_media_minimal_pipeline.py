@@ -41,6 +41,24 @@ RAW_METABOLITE_COLUMNS = {
     "Gluc": "Glucose",
     "Lac": "lactate",
     "NH4+": "ammonia",
+    "Ala": "alanine",
+    "Arg": "arginine",
+    "Asn": "asparagine",
+    "Asp": "aspartate",
+    "Cys": "cysteine",
+    "Gly": "glycine",
+    "His": "histidine",
+    "Ile": "isoleucine",
+    "Leu": "leucine",
+    "Lys": "lysine",
+    "Met": "methionine",
+    "Phe": "phenylalanine",
+    "Pro": "proline",
+    "Ser": "serine",
+    "Thr": "threonine",
+    "Trp": "tryptophan",
+    "Tyr": "tyrosine",
+    "Val": "valine",
 }
 
 RAW_FEED_SPECS = {
@@ -68,6 +86,17 @@ RAW_FEED_SPECS = {
 }
 
 RAW_REQUIRED_COLUMNS = {"DAY", "Sample ID", "Gln", "Glu", "Gluc", "Lac", "NH4+"}
+AA_FEED_CONCENTRATION_PATTERNS = [
+    ("Feed4 mL", "Feed4 {raw_col} mM"),
+    ("CellBoost mL", "CellBoost {raw_col} mM"),
+]
+
+for raw_col, metabolite in list(RAW_METABOLITE_COLUMNS.items()):
+    if metabolite not in RAW_FEED_SPECS and raw_col not in {"Gluc", "Lac", "NH4+"}:
+        RAW_FEED_SPECS[metabolite] = [
+            (volume_col, concentration_pattern.format(raw_col=raw_col))
+            for volume_col, concentration_pattern in AA_FEED_CONCENTRATION_PATTERNS
+        ]
 
 
 def find_raw_data_sheet(path: Path) -> str | None:

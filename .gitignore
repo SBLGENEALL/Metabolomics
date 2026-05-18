@@ -20,6 +20,8 @@ results/
 archive/
 inputs/*
 !inputs/.gitkeep
+**/inputs/*
+!**/inputs/.gitkeep
 *.log
 
 # OS

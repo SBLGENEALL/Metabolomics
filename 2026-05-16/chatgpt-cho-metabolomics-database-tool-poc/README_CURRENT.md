@@ -28,6 +28,18 @@ To run directly on the raw feeding workbook:
 python pipeline/interactive_pipeline.py --input "C:\Users\j3das\Downloads\CHO_raw_data_with_feeding_columns_template.xlsx"
 ```
 
+To create a POC workbook with simulated 20 amino acid spent-media columns from
+an existing raw workbook:
+
+```powershell
+python pipeline/make_poc_raw_data_with_amino_acids.py --input "C:\path\to\CHO_raw_data.xlsx" --output inputs/CHO_raw_data_with_20AA_POC.xlsx
+python pipeline/interactive_pipeline.py --input inputs/CHO_raw_data_with_20AA_POC.xlsx --skip-fba
+```
+
+The raw parser recognizes the core spent-media columns plus 3-letter amino acid
+columns such as `Ala`, `Arg`, `Asn`, `Asp`, `Cys`, `Gly`, `His`, `Ile`, `Leu`,
+`Lys`, `Met`, `Phe`, `Pro`, `Ser`, `Thr`, `Trp`, `Tyr`, and `Val`.
+
 For real fed-batch workbooks with many clones/timepoints, the interactive runner
 uses compact FBA flux output by default. To save every iCHO3K reaction flux, add:
 
