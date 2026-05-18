@@ -24,6 +24,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from spent_media_minimal_pipeline import read_input
+
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_INPUT = ROOT / "inputs" / "CHO_actual_experiment_input.xlsx"
@@ -64,29 +66,19 @@ def validate_input(input_path: Path) -> None:
             f"  copy {template} {input_path}\n"
             "The inputs/ folder is git-ignored so real experiment data stays local."
         )
-    if input_path.suffix.lower() in {".xlsx", ".xls"}:
-        xl = pd.ExcelFile(input_path)
-        sheet = "Experiment_Input" if "Experiment_Input" in xl.sheet_names else xl.sheet_names[0]
-        df = pd.read_excel(input_path, sheet_name=sheet)
-    else:
-        df = pd.read_csv(input_path)
+    df = read_input(input_path)
     required = {"sample_id", "passage_or_clone", "producer_group", "day", "replicate"}
     missing = required.difference(df.columns)
     if missing:
         raise SystemExit(f"Missing required input columns: {sorted(missing)}")
-    metabolite_cols = [
-        c for c in df.columns
-        if c not in {
-            "sample_id", "passage_or_clone", "producer_group", "day", "replicate",
-            "viable_cell_density_1e6_mL", "viability_pct", "titer_mg_L",
-            "sample_type", "batch_id", "notes",
-        }
-    ]
     print(f"Input: {input_path}")
-    print(f"Samples: {len(df)}")
+    print(f"Samples: {df[['passage_or_clone', 'day', 'replicate']].drop_duplicates().shape[0]}")
     print(f"Conditions: {', '.join(map(str, sorted(df['producer_group'].dropna().unique())))}")
-    print(f"Metabolite columns detected: {len(metabolite_cols)}")
-    print(", ".join(metabolite_cols[:40]))
+    metabolites = sorted(df["metabolite"].dropna().astype(str).unique())
+    print(f"Metabolites detected: {len(metabolites)}")
+    print(", ".join(metabolites[:40]))
+    if "source_format" in df.columns and df["source_format"].eq("Paste_Raw_Data").any():
+        print("Detected raw feeding template: Paste_Raw_Data")
 
 
 def cobra_available() -> bool:

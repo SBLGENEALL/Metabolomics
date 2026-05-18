@@ -157,6 +157,8 @@ def endpoint_bar(contrast: pd.DataFrame, output: Path):
     plot_w = width - left - right
     plot_h = height - top - bottom
     values = df[value_col].astype(float).to_numpy()
+    if not np.isfinite(values).any():
+        return
     max_abs = max(1e-9, np.nanmax(np.abs(values)))
     x_map = lambda v: left + plot_w / 2 + (v / max_abs) * (plot_w / 2)
     zero_x = x_map(0)
@@ -196,6 +198,8 @@ def heatmap(delta_df: pd.DataFrame, output: Path):
     left, top = 170, 80
     cell_w, cell_h = 150, 34
     vals = pivot.to_numpy(dtype=float).flatten()
+    if not np.isfinite(vals).any():
+        return
     max_abs = max(1e-9, np.nanmax(np.abs(vals)))
     def color(v):
         if not np.isfinite(v):

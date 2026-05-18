@@ -7,12 +7,25 @@ Use these files for the real experiment workflow.
 - Copy `templates/CHO_actual_experiment_input_template.xlsx` to `inputs/CHO_actual_experiment_input.xlsx`.
   - Fill `Experiment_Input` with spent media concentrations, VCD, viability, titer, and optional 20 amino acids.
   - `inputs/` is git-ignored so real company data is not committed.
+- The pipeline also accepts the raw feeding workbook format with a `Paste_Raw_Data`
+  sheet, such as `CHO_raw_data_with_feeding_columns_template.xlsx`.
+  - `DAY` values like `Day5` are converted to numeric day values.
+  - `Sample ID` is used as the clone/condition name.
+  - `Gln`, `Glu`, `Gluc`, `Lac`, and `NH4+` are mapped to iCHO3K-ready metabolite names.
+  - Feeding columns are used to calculate `feed_corrected_rate_per_day` and
+    `rate_for_model_per_day`, so added glucose/feed is not mistaken for cellular production.
 - Optional transcriptomics can be copied from `templates/transcriptomics_input_template.csv` to `inputs/transcriptomics_input.csv`.
 
 ## Main runner
 
 ```powershell
 python pipeline/interactive_pipeline.py
+```
+
+To run directly on the raw feeding workbook:
+
+```powershell
+python pipeline/interactive_pipeline.py --input "C:\Users\j3das\Downloads\CHO_raw_data_with_feeding_columns_template.xlsx"
 ```
 
 For explicit group comparison, for example Mother versus High:

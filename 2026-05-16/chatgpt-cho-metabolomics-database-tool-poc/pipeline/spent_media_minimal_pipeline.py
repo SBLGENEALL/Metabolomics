@@ -15,6 +15,7 @@ producer_group, viable_cell_density_1e6_mL, viability_pct, titer_mg_L
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 
 import numpy as np
@@ -34,16 +35,133 @@ SAMPLE_COLUMNS = [
 
 KNOWN_NON_METABOLITE = set(SAMPLE_COLUMNS + ["sample_type", "batch_id", "notes"])
 
+RAW_METABOLITE_COLUMNS = {
+    "Gln": "glutamine",
+    "Glu": "glutamate",
+    "Gluc": "Glucose",
+    "Lac": "lactate",
+    "NH4+": "ammonia",
+}
+
+RAW_FEED_SPECS = {
+    "Glucose": [
+        ("Glucose Feed mL", "Glucose Feed Conc mM"),
+        ("Feed4 mL", "Feed4 Glucose mM"),
+        ("CellBoost mL", "CellBoost Glucose mM"),
+    ],
+    "glutamine": [
+        ("Feed4 mL", "Feed4 Gln mM"),
+        ("CellBoost mL", "CellBoost Gln mM"),
+    ],
+    "glutamate": [
+        ("Feed4 mL", "Feed4 Glu mM"),
+        ("CellBoost mL", "CellBoost Glu mM"),
+    ],
+    "lactate": [
+        ("Feed4 mL", "Feed4 Lac mM"),
+        ("CellBoost mL", "CellBoost Lac mM"),
+    ],
+    "ammonia": [
+        ("Feed4 mL", "Feed4 NH4 mM"),
+        ("CellBoost mL", "CellBoost NH4 mM"),
+    ],
+}
+
+
+def parse_day(value) -> float:
+    if pd.isna(value):
+        return np.nan
+    if isinstance(value, (int, float)):
+        return float(value)
+    match = re.search(r"[-+]?\d*\.?\d+", str(value))
+    return float(match.group(0)) if match else np.nan
+
+
+def infer_replicate(sample_id: object) -> int:
+    match = re.search(r"(?:^|[_\-\s])R(?:ep)?(\d+)(?:$|[_\-\s])", str(sample_id), flags=re.IGNORECASE)
+    return int(match.group(1)) if match else 1
+
+
+def infer_producer_group(sample_id: object) -> str:
+    text = str(sample_id)
+    lower = text.lower()
+    if "mother" in lower or "parent" in lower:
+        return "Mother"
+    if "moderate" in lower or "medium" in lower or "mid" in lower:
+        return "Moderate"
+    if "high" in lower:
+        return "High"
+    if "low" in lower:
+        return "Low"
+    return text
+
+
+def feed_umol_for_row(row: pd.Series, metabolite: str) -> float:
+    total = 0.0
+    for volume_col, concentration_col in RAW_FEED_SPECS.get(metabolite, []):
+        volume = pd.to_numeric(row.get(volume_col), errors="coerce")
+        concentration = pd.to_numeric(row.get(concentration_col), errors="coerce")
+        if pd.notna(volume) and pd.notna(concentration):
+            total += float(volume) * float(concentration)
+    return total
+
+
+def read_raw_feeding_template(path: Path) -> pd.DataFrame:
+    raw = pd.read_excel(path, sheet_name="Paste_Raw_Data")
+    raw = raw.dropna(how="all")
+    rows = []
+    for _, row in raw.iterrows():
+        clone = row.get("Sample ID")
+        day = parse_day(row.get("DAY"))
+        if pd.isna(clone) or not np.isfinite(day):
+            continue
+        replicate = int(pd.to_numeric(row.get("Replicate"), errors="coerce")) if "Replicate" in raw.columns and pd.notna(row.get("Replicate")) else infer_replicate(clone)
+        producer_group = row.get("producer_group", row.get("Producer Group", infer_producer_group(clone)))
+        base = {
+            "sample_id": f"{clone}_Day{day:g}",
+            "passage_or_clone": str(clone),
+            "producer_group": str(producer_group),
+            "day": day,
+            "replicate": replicate,
+            "viable_cell_density_1e6_mL": row.get("Viable Density"),
+            "viability_pct": row.get("Viability"),
+            "titer_mg_L": row.get("IgG"),
+            "culture_volume_mL": row.get("Culture Volume mL"),
+            "sample_removed_mL": row.get("Sample Removed mL"),
+            "feed_note": row.get("Feed Note"),
+        }
+        for raw_col, metabolite in RAW_METABOLITE_COLUMNS.items():
+            rows.append(
+                {
+                    **base,
+                    "metabolite": metabolite,
+                    "value": row.get(raw_col),
+                    "feed_umol_since_previous": feed_umol_for_row(row, metabolite),
+                    "source_column": raw_col,
+                    "source_format": "Paste_Raw_Data",
+                }
+            )
+    return pd.DataFrame(rows)
+
 
 def read_input(path: Path) -> pd.DataFrame:
     if path.suffix.lower() in {".xlsx", ".xls"}:
         xl = pd.ExcelFile(path)
-        sheet = "Experiment_Input" if "Experiment_Input" in xl.sheet_names else "Spent_Media_Input"
-        df = pd.read_excel(path, sheet_name=sheet)
+        if "Paste_Raw_Data" in xl.sheet_names:
+            df = read_raw_feeding_template(path)
+            long_df = df.copy()
+            sheet = None
+        else:
+            sheet = "Experiment_Input" if "Experiment_Input" in xl.sheet_names else "Spent_Media_Input"
+            df = pd.read_excel(path, sheet_name=sheet)
+            long_df = None
     else:
         df = pd.read_csv(path)
+        long_df = None
 
-    if {"metabolite", "value"}.issubset(df.columns):
+    if long_df is not None:
+        pass
+    elif {"metabolite", "value"}.issubset(df.columns):
         long_df = df.copy()
     else:
         id_cols = [c for c in SAMPLE_COLUMNS if c in df.columns]
@@ -63,6 +181,9 @@ def read_input(path: Path) -> pd.DataFrame:
     long_df["replicate"] = pd.to_numeric(long_df["replicate"], errors="coerce")
     long_df["value"] = pd.to_numeric(long_df["value"], errors="coerce")
     for optional_numeric in ["viable_cell_density_1e6_mL", "viability_pct", "titer_mg_L"]:
+        if optional_numeric in long_df.columns:
+            long_df[optional_numeric] = pd.to_numeric(long_df[optional_numeric], errors="coerce")
+    for optional_numeric in ["culture_volume_mL", "sample_removed_mL", "feed_umol_since_previous"]:
         if optional_numeric in long_df.columns:
             long_df[optional_numeric] = pd.to_numeric(long_df[optional_numeric], errors="coerce")
     if "producer_group" not in long_df.columns:
@@ -118,11 +239,35 @@ def interval_rates(delta_df: pd.DataFrame) -> pd.DataFrame:
             if not np.isfinite(dt) or dt <= 0:
                 continue
             apparent_rate = (curr["value"] - prev["value"]) / dt
+            feed_umol = curr.get("feed_umol_since_previous", np.nan)
+            prev_volume = prev.get("culture_volume_mL", np.nan)
+            curr_volume = curr.get("culture_volume_mL", np.nan)
+            sample_removed = curr.get("sample_removed_mL", 0.0)
+            feed_corrected_delta_umol = np.nan
+            feed_corrected_rate = np.nan
+            if (
+                np.isfinite(curr["value"])
+                and np.isfinite(prev["value"])
+                and np.isfinite(prev_volume)
+                and np.isfinite(curr_volume)
+            ):
+                sample_removed = sample_removed if np.isfinite(sample_removed) else 0.0
+                feed_umol = feed_umol if np.isfinite(feed_umol) else 0.0
+                curr_effective_volume = curr_volume + sample_removed
+                mean_volume = np.mean([prev_volume, curr_effective_volume])
+                if mean_volume > 0:
+                    feed_corrected_delta_umol = (
+                        curr["value"] * curr_effective_volume
+                        - prev["value"] * prev_volume
+                        - feed_umol
+                    )
+                    feed_corrected_rate = feed_corrected_delta_umol / mean_volume / dt
+            rate_for_model = feed_corrected_rate if np.isfinite(feed_corrected_rate) else apparent_rate
             vcd_prev = prev.get("viable_cell_density_1e6_mL", np.nan)
             vcd_curr = curr.get("viable_cell_density_1e6_mL", np.nan)
             vcd_values = [v for v in [vcd_prev, vcd_curr] if np.isfinite(v)]
             mean_vcd = float(np.mean(vcd_values)) if vcd_values else np.nan
-            qmet = apparent_rate / mean_vcd if np.isfinite(mean_vcd) and mean_vcd > 0 else np.nan
+            qmet = rate_for_model / mean_vcd if np.isfinite(mean_vcd) and mean_vcd > 0 else np.nan
             rows.append(
                 {
                     "passage_or_clone": keys[0],
@@ -133,6 +278,10 @@ def interval_rates(delta_df: pd.DataFrame) -> pd.DataFrame:
                     "day_end": curr["day"],
                     "delta_value": curr["value"] - prev["value"],
                     "apparent_rate_per_day": apparent_rate,
+                    "feed_umol_since_previous": feed_umol,
+                    "feed_corrected_delta_umol": feed_corrected_delta_umol,
+                    "feed_corrected_rate_per_day": feed_corrected_rate,
+                    "rate_for_model_per_day": rate_for_model,
                     "qmet_per_1e6_cells_day": qmet,
                 }
             )

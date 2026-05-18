@@ -32,12 +32,22 @@ def make_exchange_constraints(rates: pd.DataFrame, mapping: pd.DataFrame) -> pd.
         print(f"Warning: no exchange mapping for {missing}")
 
     # Convention for most COBRA models: uptake is negative, secretion positive.
-    flux = merged["qmet_per_1e6_cells_day"].where(
-        merged["qmet_per_1e6_cells_day"].notna(), merged["apparent_rate_per_day"]
-    )
+    fallback_rate = merged["rate_for_model_per_day"] if "rate_for_model_per_day" in merged.columns else merged["apparent_rate_per_day"]
+    flux = merged["qmet_per_1e6_cells_day"].where(merged["qmet_per_1e6_cells_day"].notna(), fallback_rate)
     merged["measured_flux"] = flux
-    merged["lower_bound"] = np.where(flux < 0, flux, 0.0)
-    merged["upper_bound"] = np.where(flux > 0, flux, 0.0)
+    measured = merged["measured_flux"].notna()
+    merged["lower_bound"] = np.nan
+    merged["upper_bound"] = np.nan
+    merged.loc[measured, "lower_bound"] = np.where(
+        merged.loc[measured, "measured_flux"] < 0,
+        merged.loc[measured, "measured_flux"],
+        0.0,
+    )
+    merged.loc[measured, "upper_bound"] = np.where(
+        merged.loc[measured, "measured_flux"] > 0,
+        merged.loc[measured, "measured_flux"],
+        0.0,
+    )
     merged.loc[merged["sign_convention"].eq("uptake_negative") & (flux > 0), "notes"] = (
         "Positive measured value for expected uptake; check concentration trend/sign"
     )
@@ -55,7 +65,7 @@ def make_exchange_constraints(rates: pd.DataFrame, mapping: pd.DataFrame) -> pd.
         "unit",
         "notes",
     ]
-    return merged[[c for c in cols if c in merged.columns]]
+    return merged.loc[measured, [c for c in cols if c in merged.columns]]
 
 
 def write_escher_reaction_data(constraints: pd.DataFrame, outdir: Path) -> None:
