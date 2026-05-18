@@ -129,8 +129,6 @@ def add_amino_acid_scenario(df: pd.DataFrame) -> pd.DataFrame:
             value = baseline + feed_contribution - consumption + deterministic_noise(row["Sample ID"], day, aa)
             values.append(max(0.01, round(value, 4)))
         out[aa] = values
-        out[f"Feed4 {aa} mM"] = FEED4_AA_MM[aa]
-        out[f"CellBoost {aa} mM"] = CELLBOOST_AA_MM[aa]
     return out
 
 
@@ -153,7 +151,7 @@ def main() -> None:
                 "note": [
                     "POC-only simulated amino acid values.",
                     "Column names follow standard 3-letter amino acid abbreviations.",
-                    "Feed4 {AA} mM and CellBoost {AA} mM are used for feed-corrected rate calculation.",
+                    "Only amino-acid measurement columns are added; feed amino-acid composition columns are not added.",
                 ]
             }
         )

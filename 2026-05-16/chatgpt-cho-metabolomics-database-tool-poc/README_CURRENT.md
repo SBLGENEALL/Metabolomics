@@ -39,6 +39,8 @@ python pipeline/interactive_pipeline.py --input inputs/CHO_raw_data_with_20AA_PO
 The raw parser recognizes the core spent-media columns plus 3-letter amino acid
 columns such as `Ala`, `Arg`, `Asn`, `Asp`, `Cys`, `Gly`, `His`, `Ile`, `Leu`,
 `Lys`, `Met`, `Phe`, `Pro`, `Ser`, `Thr`, `Trp`, `Tyr`, and `Val`.
+The POC generator adds only amino-acid measurement columns; it does not add
+`Feed4 AA` or `CellBoost AA` composition columns.
 
 For real fed-batch workbooks with many clones/timepoints, the interactive runner
 uses compact FBA flux output by default. To save every iCHO3K reaction flux, add:
