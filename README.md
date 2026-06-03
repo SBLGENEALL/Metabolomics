@@ -1,75 +1,130 @@
-# Metabolomics
+# CHO_METABOLOMICS — Workstation Full/Internal FVA + TSV Input
 
-CHO producer clone의 spent-media / culture data를 iCHO3K production model에 적용하여 **FBA / pFBA / focused FVA / internal or full FVA** 분석을 수행하는 팀 배포용 파이프라인입니다.
+This is the final offline-friendly CHO FBA/FVA pipeline.
 
-이 repository의 목적은 FBA objective 값으로 IgG titer를 직접 예측하는 것이 아니라, measured exchange phenotype을 기반으로 High / Mother / Low producer의 **central metabolism, lactate handling, PPP/TCA, glutamine/nitrogen metabolism, mAb-related flux, FVA flexibility** 차이를 해석하는 것입니다.
+## Scientific scope
 
-## 핵심 메시지
+This pipeline is **not** a stand-alone mAb/IgG titer predictor. It uses the iCHO3K production model as a mechanistic layer to compare clone/group flux states and feasible flux ranges under measured exchange-rate constraints.
 
-> FBA/FVA는 clone titer를 직접 맞히는 black-box predictor가 아니라, clone-specific measured exchange phenotype을 iCHO3K production model 위에 올려 feasible metabolic flux state와 pathway flexibility를 해석하는 mechanistic analysis framework입니다.
+Use the following language in reports:
 
-## Repository structure
+- Step 14: **focused central/mAb pathway FVA**
+- Step 21 with `--fva_scope internal`: **internal genome-scale FVA**
+- Step 21 with `--fva_scope all`: **full model FVA**
+
+Do not call step 14 alone “full FVA.”
+
+## Offline/Linux input format
+
+For workstations where Excel is inconvenient or DRM-wrapped, use TSV files instead of XLSX.
+
+Required TSV files:
 
 ```text
-Metabolomics/
-├── README.md
-├── CHANGELOG.md
-├── .gitignore
-├── environment/
-│   ├── environment.yml
-│   └── requirements.txt
-├── model/
-│   └── README_model.md
-├── practice_data/
-│   └── README.md
-├── pipeline/
-│   └── README_pipeline.md
-├── docs/
-│   ├── workflow.md
-│   ├── FBA_FVA_concepts.md
-│   ├── key_outputs.md
-│   ├── team_presentation_guide.md
-│   └── repository_cleanup_plan.md
-├── examples/
-│   └── README.md
-└── results_template/
-    └── README.md
+data/raw/practice_20aa_tsv/raw_timeseries.tsv
+data/raw/practice_20aa_tsv/metabolite_map.tsv
+data/raw/practice_20aa_tsv/feed_composition.tsv
 ```
 
-## Recommended workstation run
+For your own data, place the same three files here:
 
-인터넷이 안 되는 Linux workstation에서는 TSV input을 권장합니다.
+```text
+data/raw/own_experiment/raw_timeseries.tsv
+data/raw/own_experiment/metabolite_map.tsv
+data/raw/own_experiment/feed_composition.tsv
+```
+
+Then run with:
 
 ```bash
-cd CHO_METABOLOMICS
-
-rm -rf data/processed results logs
-
-python run_pipeline.py   --dataset practice_20aa   --input_format tsv   --rate_days 7,10   --analysis_mode both   --constraint_policy production_relaxed   --feed_volume_mode interval   --demand_scale auto   --steps 17,1,2,3,10,14,16,21,19,20,6   --fva_scope internal   --fva_targets group_avg   --fva_processes 16
+--input_format tsv
 ```
 
-워크스테이션 성능이 충분하면 full model FVA도 가능합니다.
+## Fast focused FBA/FVA workflow
+
+Use this for quick development, figures, focused Escher maps, and presentation outputs:
 
 ```bash
-python run_pipeline.py   --dataset practice_20aa   --input_format tsv   --rate_days 7,10   --analysis_mode both   --constraint_policy production_relaxed   --feed_volume_mode interval   --demand_scale auto   --steps 17,1,2,3,10,14,16,21,19,20,6   --fva_scope all   --fva_targets group_avg   --fva_processes 16
+python run_pipeline.py \
+  --dataset practice_20aa \
+  --input_format tsv \
+  --rate_days 7,10 \
+  --analysis_mode both \
+  --constraint_policy production_relaxed \
+  --feed_volume_mode interval \
+  --demand_scale auto \
+  --steps 17,1,2,3,10,14,16,18,19,20,6
 ```
 
-## Key outputs to check first
+## Workstation-scale internal FVA workflow
 
-1. QC: `results/<dataset>/tables/data_qc_warnings.csv`, `results/<dataset>/REPORT_SUMMARY.md`
-2. Input phenotype: `exchange_rates.csv`, `Fig2_rate_heatmap.png`, `Fig3_lac_glc_ratio.png`
-3. pFBA flux difference: `Fig10B_central_mab_flux_heatmap_zscore.png`, `Fig11_central_mab_flux_delta.png`
-4. FVA range separation: `full_fva_all_high_low_overlap.csv`, `full_fva_all_central_mab_subset.csv`, `Fig21_full_fva_high_low_separation.png`
-5. Pathway summary: `pathway_scores.csv`, `pathway_score_high_low_delta.csv`, `Fig15_pathway_scores_fva_overlap.png`
-6. Escher: `CHO_focus_core_carbon_map.json` + `focused_escher_flux_high_minus_low_cho.json`
+Use this on Linux/workstation. This runs internal FVA across all non-exchange reactions for group averages first.
+
+```bash
+python run_pipeline.py \
+  --dataset practice_20aa \
+  --input_format tsv \
+  --rate_days 7,10 \
+  --analysis_mode both \
+  --constraint_policy production_relaxed \
+  --feed_volume_mode interval \
+  --demand_scale auto \
+  --steps 17,1,2,3,10,14,16,21,19,20,6 \
+  --fva_scope internal \
+  --fva_targets group_avg \
+  --fva_processes 16
+```
+
+If the workstation is very strong, you may try full model FVA:
+
+```bash
+--fva_scope all
+```
+
+If it is too slow, reduce the target set:
+
+```bash
+--fva_targets representative
+```
+
+or reduce processes:
+
+```bash
+--fva_processes 8
+```
+
+## FVA scope definitions
+
+```text
+exchange  = uptake/secretion reactions only
+focused   = curated central metabolism + mAb pathway panel
+internal  = all non-exchange internal reactions
+all       = every reaction in iCHO3K
+```
+
+## Key output files
+
+Focused analysis:
+
+```text
+results/<dataset>/tables/central_mab_fva_report.csv
+results/<dataset>/figures/Fig10_central_mab_flux_heatmap.png
+results/<dataset>/figures/Fig10B_central_mab_flux_zscore.png
+results/<dataset>/figures/Fig12_focused_core_fva_range.png
+results/<dataset>/escher_maps/focused/CHO_focus_core_carbon_map.json
+```
+
+Internal/full FVA:
+
+```text
+results/<dataset>/tables/full_fva/full_fva_internal_summary.csv
+results/<dataset>/tables/full_fva/full_fva_internal_combined_report.csv
+results/<dataset>/tables/full_fva/full_fva_internal_high_low_overlap.csv
+results/<dataset>/tables/full_fva/full_fva_internal_central_mab_subset.csv
+results/<dataset>/figures/Fig21_full_fva_high_low_separation.png
+results/<dataset>/figures/Fig21B_full_fva_range_delta.png
+```
 
 ## Interpretation caution
 
-- `DM_igg_g` objective max가 flat할 수 있으며, 이 값을 titer prediction으로 과해석하지 않습니다.
-- measured-demand mode는 실측 qIgG를 demand constraint로 고정한 explanation mode입니다.
-- FBA/FVA 결과는 measured intracellular flux가 아니라 constraint-based feasible flux state입니다.
-- FVA range가 매우 큰 reaction은 under-constrained cycle 또는 model loop 영향을 받을 수 있으므로 focused central/mAb subset과 overlap analysis를 함께 봅니다.
-
-## Version
-
-Current distribution target: `v1.0.0` — workstation-ready TSV + focused/internal/full FVA pipeline.
+FVA ranges are model-based feasible ranges, not directly measured intracellular fluxes. Very large ranges can reflect under-constrained reactions or thermodynamic loops. Prioritize focused pathway reactions, robust High/Low separation, and consistency with measured exchange phenotypes.
