@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+data/metabolomics/processed/
+results/
+logs/
+
+~$*.xlsx
+~$*.xls

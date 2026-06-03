@@ -1,0 +1,8 @@
+cobra
+pandas
+numpy
+scipy
+matplotlib
+openpyxl
+scikit-learn
+escher
