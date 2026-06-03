@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Runtime outputs
+results/
+logs/
+data/processed/
+
+# Large/private model files
+model/**/*.json
+model/**/*.xml
+model/**/*.mat
+*.zip
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/

@@ -1,0 +1,4 @@
+Feed	Gluc	Lac	NH4+	Ala	Arg	Asn	Asp	Cys	Gln	Glu	Gly	His	Ile	Leu	Lys	Met	Phe	Pro	Ser	Thr	Trp	Tyr	Val
+FunctionMax	550	0	0	20	25	45	5	8	90	15	15	12	22	28	28	10	16	18	32	24	5	8	25
+CellBoost 7A	120	0	0	35	45	60	10	10	60	18	25	18	40	50	50	18	28	25	45	40	8	12	42
+CellBoost 7B	80	0	0	25	35	35	8	12	35	25	18	15	35	45	42	16	24	40	35	34	7	10	36
