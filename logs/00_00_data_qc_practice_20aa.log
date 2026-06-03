@@ -1,0 +1,9 @@
+=================================================================
+  17_data_qc.py — practice_20aa
+=================================================================
+  Input: TSV C:\METABOLOMICS_RELEASE\Metabolomics\data\raw\practice_20aa_tsv\raw_timeseries.tsv
+  [saved] results/practice_20aa/tables/data_qc_required_columns.csv
+  [saved] results/practice_20aa/tables/data_qc_warnings.csv
+  QC summary: 0 ERROR, 0 WARN
+  OK data QC complete
+

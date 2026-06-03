@@ -1,0 +1,38 @@
+column,required,present,missing_fraction
+Sample ID,True,True,0.0
+DAY,True,True,0.0
+IgG,True,True,0.0
+Viable Density,True,True,0.0
+Total Density,True,True,0.0
+Viability,True,True,0.0
+Culture Volume mL,True,True,0.0
+Gluc,True,True,0.0
+Lac,True,True,0.0
+NH4+,True,True,0.0
+Sample Removed mL,False,True,0.0
+FunctionMax mL,False,True,0.0
+CellBoost 7A mL,False,True,0.0
+CellBoost 7B mL,False,True,0.0
+Osm,False,True,0.0
+pH,False,True,0.0
+PO2,False,True,0.0
+Ala,False,True,0.0
+Arg,False,True,0.0
+Asn,False,True,0.0
+Asp,False,True,0.0
+Cys,False,True,0.0
+Gln,False,True,0.0
+Glu,False,True,0.0
+Gly,False,True,0.0
+His,False,True,0.0
+Ile,False,True,0.0
+Leu,False,True,0.0
+Lys,False,True,0.0
+Met,False,True,0.0
+Phe,False,True,0.0
+Pro,False,True,0.0
+Ser,False,True,0.0
+Thr,False,True,0.0
+Trp,False,True,0.0
+Tyr,False,True,0.0
+Val,False,True,0.0

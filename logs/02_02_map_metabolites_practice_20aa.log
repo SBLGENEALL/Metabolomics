@@ -1,0 +1,57 @@
+=================================================================
+  02_map_metabolites.py — practice_20aa
+=================================================================
+  Constraint policy: production_relaxed
+  Model : iCHO3K_cho_prod_generic_unblocked.json
+  Rxns  : 8368 | Genes: 2929
+  Obj   : DM_igg_g (IgG/mAb production)
+
+  [Exchange ID 검증]
+  대사물질                 Exchange ID                    상태         lb/ub               
+  ──────────────────────────────────────────────────────────────────────────────────
+  ✔ Gluc                 EX_glc_e                       OK         lb=0, ub=1000
+  ✔ Lac                  EX_lac_L_e                     OK         lb=0, ub=1000
+  ✔ NH4+                 EX_nh4_e                       OK         lb=0, ub=1000
+  ✔ Ala                  EX_ala_L_e                     OK         lb=0, ub=1000
+  ✔ Arg                  EX_arg_L_e                     OK         lb=0, ub=1000
+  ✔ Asn                  EX_asn_L_e                     OK         lb=0, ub=1000
+  ✔ Asp                  EX_asp_L_e                     OK         lb=0, ub=1000
+  ✔ Cys                  EX_cys_L_e                     OK         lb=0, ub=1000
+  ✔ Gln                  EX_gln_L_e                     OK         lb=0, ub=1000
+  ✔ Glu                  EX_glu_L_e                     OK         lb=0, ub=1000
+  ✔ Gly                  EX_gly_e                       OK         lb=0, ub=1000
+  ✔ His                  EX_his_L_e                     OK         lb=0, ub=1000
+  ✔ Ile                  EX_ile_L_e                     OK         lb=0, ub=1000
+  ✔ Leu                  EX_leu_L_e                     OK         lb=0, ub=1000
+  ✔ Lys                  EX_lys_L_e                     OK         lb=0, ub=1000
+  ✔ Met                  EX_met_L_e                     OK         lb=0, ub=1000
+  ✔ Phe                  EX_phe_L_e                     OK         lb=0, ub=1000
+  ✔ Pro                  EX_pro_L_e                     OK         lb=0, ub=1000
+  ✔ Ser                  EX_ser_L_e                     OK         lb=0, ub=1000
+  ✔ Thr                  EX_thr_L_e                     OK         lb=0, ub=1000
+  ✔ Trp                  EX_trp_L_e                     OK         lb=0, ub=1000
+  ✔ Tyr                  EX_tyr_L_e                     OK         lb=0, ub=1000
+  ✔ Val                  EX_val_L_e                     OK         lb=0, ub=1000
+
+  매핑 성공: 23/23개
+
+  [FBA Constraints 생성]
+  strict constraints are saved as all_constraints_strict
+  active constraints use policy=production_relaxed
+  High01      : 23 active constraints (1 relaxed nutrient bounds)
+  High02      : 23 active constraints (1 relaxed nutrient bounds)
+  High03      : 23 active constraints (0 relaxed nutrient bounds)
+  Low01       : 23 active constraints (2 relaxed nutrient bounds)
+  Low02       : 23 active constraints (2 relaxed nutrient bounds)
+  Low03       : 23 active constraints (2 relaxed nutrient bounds)
+  Mother01    : 23 active constraints (2 relaxed nutrient bounds)
+  Mother02    : 22 active constraints (1 relaxed nutrient bounds)
+  Mother03    : 23 active constraints (1 relaxed nutrient bounds)
+
+  [saved] results/practice_20aa/tables/metabolite_mapping.csv
+  [saved] results/practice_20aa/tables/constraint_policy_bounds.csv
+  [saved] data/processed/rates_practice_20aa.pkl (updated)
+
+  OK  02_map_metabolites 완료
+  다음: python scripts/steps/03_run_fba.py --dataset practice_20aa
+

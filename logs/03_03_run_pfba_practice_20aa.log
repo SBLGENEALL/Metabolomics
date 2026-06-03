@@ -1,0 +1,53 @@
+=================================================================
+  03_run_fba.py — practice_20aa
+=================================================================
+  Model : iCHO3K_cho_prod_generic_unblocked.json
+  Rxns  : 8368 | Genes: 2929
+  Obj   : DM_igg_g (IgG/mAb production)
+
+  Fixed production objective : DM_igg_g
+  Analysis mode              : both
+  Biomass minimum fraction   : 0.0
+  Rule: objective is never selected from correlation with IgG.
+
+  [Prediction mode] no-IgG-input diagnostics + ML-ready mechanistic features
+     Clone        status         FBA_max_DM  IgG_day14
+  ────────────────────────────────────────────────────────────
+  ★ High01       optimal         5.005e-04      14000
+  ★ High02       optimal         5.005e-04      16500
+  ★ High03       optimal         5.005e-04      19000
+  ▼ Low01        optimal         5.005e-04       3500
+  ▼ Low02        optimal         5.005e-04       4800
+  ▼ Low03        optimal         5.005e-04       6200
+    Mother01     optimal         5.005e-04       8000
+    Mother02     optimal         5.005e-04       9800
+    Mother03     optimal         5.005e-04      11500
+
+  Prediction-vs-observed validation: not meaningful (flat/low-variance predicted capacity).
+
+  [Explanation mode] fix scaled measured qIgG demand and run pFBA
+  Global measured-qIgG demand scale: 0.170249
+  NOTE: this is data-enforced flux reconstruction, not production prediction.
+
+     Clone        status       strict_cap     qIgG_obs   scaled_dem   total_flux
+  ──────────────────────────────────────────────────────────────────────────────────────
+  ★ High01       optimal       5.005e-04    2.427e-03    4.133e-04         18.9
+  ★ High02       optimal       5.005e-04    2.528e-03    4.303e-04         19.7
+  ★ High03       optimal       5.005e-04    2.646e-03    4.505e-04         20.7
+  ▼ Low01        optimal       5.005e-04    7.821e-04    1.332e-04         5.92
+  ▼ Low02        optimal       5.005e-04    8.631e-04    1.469e-04         6.51
+  ▼ Low03        optimal       5.005e-04    1.044e-03    1.777e-04         7.88
+    Mother01     optimal       5.005e-04    1.383e-03    2.354e-04         10.5
+    Mother02     optimal       5.005e-04    1.569e-03    2.671e-04           12
+    Mother03     optimal       5.005e-04    1.728e-03    2.942e-04         13.2
+  [saved] results/practice_20aa/tables/prediction_fba_results.csv
+  [saved] results/practice_20aa/tables/explanation_fba_results.csv
+  [saved] results/practice_20aa/tables/fba_results.csv
+  [saved] results/practice_20aa/tables/model_predictability_diagnostics.csv
+  [saved] results/practice_20aa/tables/production_capacity_diagnostics.csv
+  [saved] results/practice_20aa/tables/lac_glc_ratio.csv
+  [saved] results/practice_20aa/tables/fba_exchange_compare.csv
+
+  OK  03_run_fba 완료
+  다음: python scripts/steps/04_run_fva.py --dataset practice_20aa --analysis_mode both
+
