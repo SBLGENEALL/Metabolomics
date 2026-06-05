@@ -46,6 +46,9 @@ OPTIONAL_MAPPING_COLUMNS = [
     "priority_for_figures",
 ]
 
+REACTION_ID_ALIASES = ["rxn_id", "reaction", "Reaction ID", "reactionID", "id"]
+MAPPING_VALUE_COLUMNS = REQUIRED_MAPPING_COLUMNS[1:] + OPTIONAL_MAPPING_COLUMNS
+
 
 def read_csv_if_exists(path: Optional[str]) -> pd.DataFrame:
     if path and os.path.exists(path):
@@ -53,13 +56,51 @@ def read_csv_if_exists(path: Optional[str]) -> pd.DataFrame:
     return pd.DataFrame()
 
 
+def collapse_duplicate_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Collapse duplicate column labels by taking the first non-null value.
+
+    Some upstream v1.0 tables may carry both `reaction_id` and aliases such as
+    `rxn_id`, or duplicate labels after previous merges. Pandas refuses to merge
+    when a merge key is not unique, so normalize tables defensively here.
+    """
+    if df.empty or not df.columns.has_duplicates:
+        return df
+
+    data = {}
+    for col in dict.fromkeys(df.columns):
+        same = df.loc[:, df.columns == col]
+        if same.shape[1] == 1:
+            data[col] = same.iloc[:, 0]
+        else:
+            data[col] = same.bfill(axis=1).iloc[:, 0]
+    return pd.DataFrame(data)
+
+
 def normalize_reaction_id(df: pd.DataFrame) -> pd.DataFrame:
-    out = df.copy()
-    rename = {}
-    for old in ["rxn_id", "reaction", "Reaction ID", "reactionID"]:
-        if old in out.columns and "reaction_id" not in out.columns:
-            rename[old] = "reaction_id"
-    out = out.rename(columns=rename)
+    out = collapse_duplicate_columns(df.copy())
+
+    if "reaction_id" not in out.columns:
+        for alias in REACTION_ID_ALIASES:
+            if alias in out.columns:
+                out = out.rename(columns={alias: "reaction_id"})
+                break
+    else:
+        # If aliases also exist, use them only to fill missing reaction_id values,
+        # then drop them to keep a single unambiguous merge key.
+        rid = out["reaction_id"].astype("string")
+        missing = rid.isna() | rid.fillna("").str.strip().eq("")
+        for alias in REACTION_ID_ALIASES:
+            if alias in out.columns:
+                alias_values = out[alias].astype("string")
+                rid = rid.mask(missing, alias_values)
+                missing = rid.isna() | rid.fillna("").str.strip().eq("")
+        out["reaction_id"] = rid
+
+    drop_aliases = [c for c in REACTION_ID_ALIASES if c in out.columns and c != "reaction_id"]
+    if drop_aliases:
+        out = out.drop(columns=drop_aliases)
+
+    out = collapse_duplicate_columns(out)
     if "reaction_id" in out.columns:
         out["reaction_id"] = out["reaction_id"].astype(str)
     return out
@@ -77,7 +118,8 @@ def infer_reaction_class(reaction_id: str) -> str:
 
 
 def load_mapping(path: str) -> pd.DataFrame:
-    mapping = pd.read_csv(path)
+    mapping = collapse_duplicate_columns(pd.read_csv(path))
+    mapping = normalize_reaction_id(mapping)
     missing = [c for c in REQUIRED_MAPPING_COLUMNS if c not in mapping.columns]
     if missing:
         raise ValueError(f"Mapping file is missing required columns: {missing}")
@@ -94,7 +136,14 @@ def attach_mapping(df: pd.DataFrame, mapping: pd.DataFrame, source_type: str) ->
     out = normalize_reaction_id(df)
     if "reaction_id" not in out.columns:
         raise ValueError(f"{source_type} table does not contain rxn_id/reaction_id")
+
+    # Avoid carrying stale mapping columns from prior runs into the new merge.
+    stale_mapping_cols = [c for c in MAPPING_VALUE_COLUMNS if c in out.columns]
+    if stale_mapping_cols:
+        out = out.drop(columns=stale_mapping_cols)
+
     out = out.merge(mapping, on="reaction_id", how="left", suffixes=("", "_chompact"))
+    out = collapse_duplicate_columns(out)
     out["source_type"] = source_type
     out["mapping_status"] = out["chompact_pathway"].notna().map({True: "mapped", False: "unmapped"})
     out["chompact_pathway"] = out["chompact_pathway"].fillna("Other / unmapped")
@@ -105,9 +154,8 @@ def attach_mapping(df: pd.DataFrame, mapping: pd.DataFrame, source_type: str) ->
     if "reaction_class" not in out.columns:
         out["reaction_class"] = ""
     out["reaction_class"] = out["reaction_class"].fillna("")
-    out.loc[out["reaction_class"].eq(""), "reaction_class"] = out.loc[
-        out["reaction_class"].eq(""), "reaction_id"
-    ].map(infer_reaction_class)
+    empty_class = out["reaction_class"].eq("")
+    out.loc[empty_class, "reaction_class"] = out.loc[empty_class, "reaction_id"].map(infer_reaction_class)
     for col in ["is_measured_exchange", "is_product_related", "is_constraint_reaction"]:
         if col not in out.columns:
             out[col] = False
@@ -137,6 +185,7 @@ def make_qc(mapped: Dict[str, pd.DataFrame]) -> pd.DataFrame:
                 "mapping_rate_reactions": 0.0,
             })
             continue
+        df = normalize_reaction_id(df)
         unique = df.drop_duplicates("reaction_id")
         n_rxn = len(unique)
         n_mapped = int((unique["mapping_status"] == "mapped").sum())
@@ -208,7 +257,7 @@ def main() -> None:
 
     qc = make_qc(outputs)
     qc.to_csv(os.path.join(chompact_dir, "chompact_mapping_qc.csv"), index=False)
-    non_empty = [df for df in outputs.values() if not df.empty]
+    non_empty = [normalize_reaction_id(df) for df in outputs.values() if not df.empty]
     unmapped = pd.concat(non_empty, ignore_index=True) if non_empty else pd.DataFrame()
     if not unmapped.empty:
         cols = [c for c in ["reaction_id", "source_type", "reaction_name", "subsystem", "mapping_status"] if c in unmapped.columns]
