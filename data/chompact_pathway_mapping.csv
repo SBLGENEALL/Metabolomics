@@ -1,0 +1,70 @@
+﻿reaction_id,reaction_name,subsystem,chompact_pathway,chompact_subpathway,interpretation_note,reaction_class,is_measured_exchange,is_product_related,is_constraint_reaction,priority_for_figures
+EX_glc_e,D-Glucose exchange,Exchange,Central carbon metabolism,Glucose uptake,Measured glucose uptake constraint,exchange,TRUE,FALSE,TRUE,1
+EX_lac_L_e,L-Lactate exchange,Exchange,Lactate metabolism,Lactate exchange,Measured lactate secretion or consumption,exchange,TRUE,FALSE,TRUE,1
+EX_nh4_e,Ammonium exchange,Exchange,Glutamine and glutamate metabolism,Ammonia burden,Measured nitrogen byproduct secretion,exchange,TRUE,FALSE,TRUE,1
+EX_gln_L_e,L-Glutamine exchange,Exchange,Glutamine and glutamate metabolism,Glutamine uptake,Measured glutamine uptake constraint,exchange,TRUE,FALSE,TRUE,1
+EX_glu_L_e,L-Glutamate exchange,Exchange,Glutamine and glutamate metabolism,Glutamate exchange,Measured glutamate uptake or secretion,exchange,TRUE,FALSE,TRUE,1
+EX_ala_L_e,L-Alanine exchange,Exchange,Amino acid metabolism,Alanine exchange,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+EX_arg_L_e,L-Arginine exchange,Exchange,Amino acid metabolism,Arginine uptake,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+EX_asn_L_e,L-Asparagine exchange,Exchange,Amino acid metabolism,Asparagine uptake,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+EX_asp_L_e,L-Aspartate exchange,Exchange,Amino acid metabolism,Aspartate exchange,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+EX_cys_L_e,L-Cysteine exchange,Exchange,Amino acid metabolism,Cysteine uptake,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+EX_gly_e,Glycine exchange,Exchange,Amino acid metabolism,Glycine exchange,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+EX_his_L_e,L-Histidine exchange,Exchange,Amino acid metabolism,Histidine uptake,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+EX_ile_L_e,L-Isoleucine exchange,Exchange,Amino acid metabolism,Isoleucine uptake,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+EX_leu_L_e,L-Leucine exchange,Exchange,Amino acid metabolism,Leucine uptake,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+EX_lys_L_e,L-Lysine exchange,Exchange,Amino acid metabolism,Lysine uptake,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+EX_met_L_e,L-Methionine exchange,Exchange,Amino acid metabolism,Methionine uptake,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+EX_phe_L_e,L-Phenylalanine exchange,Exchange,Amino acid metabolism,Phenylalanine uptake,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+EX_pro_L_e,L-Proline exchange,Exchange,Amino acid metabolism,Proline exchange,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+EX_ser_L_e,L-Serine exchange,Exchange,Amino acid metabolism,Serine uptake,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+EX_thr_L_e,L-Threonine exchange,Exchange,Amino acid metabolism,Threonine uptake,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+EX_trp_L_e,L-Tryptophan exchange,Exchange,Amino acid metabolism,Tryptophan uptake,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+EX_tyr_L_e,L-Tyrosine exchange,Exchange,Amino acid metabolism,Tyrosine uptake,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+EX_val_L_e,L-Valine exchange,Exchange,Amino acid metabolism,Valine uptake,Measured amino acid exchange,exchange,TRUE,FALSE,TRUE,1
+DM_igg_g,IgG demand,Demand,Product synthesis and IgG assembly,IgG product demand,Model-predicted IgG objective or measured-demand sink,demand,FALSE,TRUE,FALSE,1
+DM_for_igg,IgG demand,Demand,Product synthesis and IgG assembly,IgG product demand,Alternative IgG demand reaction,demand,FALSE,TRUE,FALSE,1
+igg_formation,IgG formation,Product,Product synthesis and IgG assembly,IgG assembly,IgG assembly reaction,product,FALSE,TRUE,FALSE,1
+igg_hc,IgG heavy chain,Product,Product synthesis and IgG assembly,Heavy chain synthesis,IgG heavy-chain synthesis reaction,product,FALSE,TRUE,FALSE,1
+igg_lc,IgG light chain,Product,Product synthesis and IgG assembly,Light chain synthesis,IgG light-chain synthesis reaction,product,FALSE,TRUE,FALSE,1
+HEX1,Hexokinase,Glycolysis,Central carbon metabolism,Glycolysis entry,Glucose phosphorylation internal model-predicted flux,internal,FALSE,FALSE,FALSE,1
+PGI,Glucose-6-phosphate isomerase,Glycolysis,Central carbon metabolism,Glycolysis,Model-predicted glycolysis flux,internal,FALSE,FALSE,FALSE,1
+PFK,Phosphofructokinase,Glycolysis,Central carbon metabolism,Glycolysis,Model-predicted glycolysis flux,internal,FALSE,FALSE,FALSE,1
+FBA,Aldolase,Glycolysis,Central carbon metabolism,Glycolysis,Model-predicted glycolysis flux,internal,FALSE,FALSE,FALSE,1
+TPI,Triose phosphate isomerase,Glycolysis,Central carbon metabolism,Glycolysis,Model-predicted glycolysis flux,internal,FALSE,FALSE,FALSE,1
+GAPD,Glyceraldehyde-3-phosphate dehydrogenase,Glycolysis,Central carbon metabolism,Glycolysis redox step,Model-predicted glycolysis flux,internal,FALSE,FALSE,FALSE,1
+PGK,Phosphoglycerate kinase,Glycolysis,Central carbon metabolism,Glycolysis ATP step,Model-predicted glycolysis flux,internal,FALSE,FALSE,FALSE,1
+PGM,Phosphoglycerate mutase,Glycolysis,Central carbon metabolism,Glycolysis,Model-predicted glycolysis flux,internal,FALSE,FALSE,FALSE,1
+ENO,Enolase,Glycolysis,Central carbon metabolism,Glycolysis,Model-predicted glycolysis flux,internal,FALSE,FALSE,FALSE,1
+PYK,Pyruvate kinase,Glycolysis,Central carbon metabolism,Lower glycolysis,Model-predicted glycolysis flux,internal,FALSE,FALSE,FALSE,1
+LDH_L,Lactate dehydrogenase,Pyruvate/Lactate,Lactate metabolism,Lactate production or consumption,Model-predicted lactate node flux,internal,FALSE,FALSE,FALSE,1
+PDHm,Pyruvate dehydrogenase,Pyruvate/Lactate,TCA cycle,Pyruvate entry to TCA,Model-predicted mitochondrial carbon entry,internal,FALSE,FALSE,FALSE,1
+PCm,Pyruvate carboxylase,Pyruvate/Lactate,TCA cycle,Anaplerosis,Model-predicted anaplerotic flux,internal,FALSE,FALSE,FALSE,1
+ME1m,Malic enzyme,Pyruvate/Lactate,Energy and redox metabolism,Malic enzyme,Model-predicted redox/anaplerotic flux,internal,FALSE,FALSE,FALSE,1
+ME2m,Malic enzyme,Pyruvate/Lactate,Energy and redox metabolism,Malic enzyme,Model-predicted redox/anaplerotic flux,internal,FALSE,FALSE,FALSE,1
+CSm,Citrate synthase,TCA,TCA cycle,Citrate synthase,Model-predicted TCA flux,internal,FALSE,FALSE,FALSE,1
+ACONTam,Aconitase,TCA,TCA cycle,Aconitase,Model-predicted TCA flux,internal,FALSE,FALSE,FALSE,1
+ACONTbm,Aconitase,TCA,TCA cycle,Aconitase,Model-predicted TCA flux,internal,FALSE,FALSE,FALSE,1
+ICDHyrm,Isocitrate dehydrogenase,TCA,TCA cycle,Isocitrate dehydrogenase,Model-predicted TCA/redox flux,internal,FALSE,FALSE,FALSE,1
+AKGDm,Alpha-ketoglutarate dehydrogenase,TCA,TCA cycle,Alpha-KG dehydrogenase,Model-predicted TCA nitrogen-linked flux,internal,FALSE,FALSE,FALSE,1
+SUCOASm,Succinyl-CoA synthetase,TCA,TCA cycle,Succinyl-CoA synthetase,Model-predicted TCA flux,internal,FALSE,FALSE,FALSE,1
+SUCD1m,Succinate dehydrogenase,TCA,TCA cycle,Succinate dehydrogenase,Model-predicted TCA/ETC flux,internal,FALSE,FALSE,FALSE,1
+FUMm,Fumarase,TCA,TCA cycle,Fumarase,Model-predicted TCA flux,internal,FALSE,FALSE,FALSE,1
+MDHm,Malate dehydrogenase,TCA,TCA cycle,Malate dehydrogenase,Model-predicted TCA/redox flux,internal,FALSE,FALSE,FALSE,1
+G6PDH2r,Glucose-6-phosphate dehydrogenase,PPP/Redox,Pentose phosphate pathway,Oxidative PPP,Model-predicted NADPH generation,internal,FALSE,FALSE,FALSE,1
+PGL,6-phosphogluconolactonase,PPP/Redox,Pentose phosphate pathway,Oxidative PPP,Model-predicted PPP flux,internal,FALSE,FALSE,FALSE,1
+GND,6-phosphogluconate dehydrogenase,PPP/Redox,Pentose phosphate pathway,Oxidative PPP,Model-predicted NADPH generation,internal,FALSE,FALSE,FALSE,1
+TKT1,Transketolase,PPP/Redox,Pentose phosphate pathway,Non-oxidative PPP,Model-predicted PPP flux,internal,FALSE,FALSE,FALSE,1
+TKT2,Transketolase,PPP/Redox,Pentose phosphate pathway,Non-oxidative PPP,Model-predicted PPP flux,internal,FALSE,FALSE,FALSE,1
+TALA,Transaldolase,PPP/Redox,Pentose phosphate pathway,Non-oxidative PPP,Model-predicted PPP flux,internal,FALSE,FALSE,FALSE,1
+GLNS,Glutamine synthetase,Glutamine/Nitrogen,Glutamine and glutamate metabolism,Glutamine synthesis,Model-predicted nitrogen metabolism flux,internal,FALSE,FALSE,FALSE,1
+GLUNm,Glutaminase,Glutamine/Nitrogen,Glutamine and glutamate metabolism,Glutamine catabolism,Model-predicted glutaminolysis flux,internal,FALSE,FALSE,FALSE,1
+GLUDym,Glutamate dehydrogenase,Glutamine/Nitrogen,Glutamine and glutamate metabolism,Glutamate dehydrogenase,Model-predicted nitrogen/TCA link,internal,FALSE,FALSE,FALSE,1
+GLUDxm,Glutamate dehydrogenase,Glutamine/Nitrogen,Glutamine and glutamate metabolism,Glutamate dehydrogenase,Model-predicted nitrogen/TCA link,internal,FALSE,FALSE,FALSE,1
+ALATA_L,Alanine transaminase,Glutamine/Nitrogen,Amino acid metabolism,Alanine transamination,Model-predicted amino acid nitrogen flux,internal,FALSE,FALSE,FALSE,1
+ASPTA,Aspartate transaminase,Glutamine/Nitrogen,Amino acid metabolism,Aspartate transamination,Model-predicted amino acid nitrogen flux,internal,FALSE,FALSE,FALSE,1
+ATPM,ATP maintenance,Energy,Energy and redox metabolism,ATP maintenance,Model-predicted maintenance energy demand,internal,FALSE,FALSE,FALSE,1
+ATPS4m,ATP synthase,Energy,Energy and redox metabolism,Oxidative phosphorylation,Model-predicted mitochondrial ATP generation,internal,FALSE,FALSE,FALSE,1
+NADH2_u10m,NADH dehydrogenase,Energy,Energy and redox metabolism,Complex I,Model-predicted electron transport flux,internal,FALSE,FALSE,FALSE,1
+CYOR_u10m,Cytochrome reductase,Energy,Energy and redox metabolism,Complex III,Model-predicted electron transport flux,internal,FALSE,FALSE,FALSE,1
+CYOOm,Cytochrome oxidase,Energy,Energy and redox metabolism,Complex IV,Model-predicted electron transport flux,internal,FALSE,FALSE,FALSE,1

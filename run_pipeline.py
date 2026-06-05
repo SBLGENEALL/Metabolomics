@@ -41,6 +41,11 @@ STEP_MAP = {
     "07": ("07_pathway_scores.py", "Pathway scores + FVA overlap + sensitivity"),
     "08": ("08_make_figures.py", "Final figures"),
     "09": ("09_generate_report.py", "Auto-generated Markdown report"),
+    "10": ("10_map_to_chompact.py", "Optional v1.1 CHOmpact pathway mapping"),
+    "11": ("11_score_chompact_pathways.py", "Optional v1.1 CHOmpact pathway scoring"),
+    "12": ("12_demand_sensitivity.py", "Optional v1.1 demand-scale sensitivity review"),
+    "13": ("13_rank_pathway_biomarkers.py", "Optional v1.1 pathway biomarker ranking"),
+    "14": ("14_make_chompact_figures.py", "Optional v1.1 CHOmpact figures + executive summary"),
 }
 
 FIGURE_RENAME_MAP = {
