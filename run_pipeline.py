@@ -52,6 +52,7 @@ FIGURE_RENAME_MAP = {
     "Fig21_full_fva_high_low_separation.png": "Fig9_full_fva_high_low_separation.png",
     "Fig21B_full_fva_range_delta.png": "Fig10_full_fva_range_delta.png",
     "Fig8_summary_panel.png": "Fig11_summary_panel.png",
+    "Fig13_data_qc_overview.png": "SuppFig1_data_qc_overview.png",
 }
 
 # Legacy or retired files that should not remain in v1.0 output folders.
@@ -64,6 +65,7 @@ RETIRED_FIGURES = {
     "Fig12_focused_core_fva_range.png",
     "Fig12B_focused_core_fva_range_zscore.png",
     "Fig12C_focused_fva_high_low_delta.png",
+    "Fig13_data_qc_overview.png",
     "Fig14_interval_pathway_scores.png",
     "Fig15_pathway_scores_fva_overlap.png",
     "Fig21_full_fva_high_low_separation.png",
@@ -223,7 +225,7 @@ for step_id in to_run:
 
     if r.returncode == 0:
         print("  OK")
-        if step_id in {"05", "06", "07", "08"}:
+        if step_id in {"00", "05", "06", "07", "08"}:
             _standardize_figures(args.dataset)
     else:
         print(f"  ERROR -> {log}")
