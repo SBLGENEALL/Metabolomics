@@ -1,7 +1,6 @@
 import argparse
 import glob
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -42,74 +41,6 @@ STEP_MAP = {
     "08": ("08_make_figures.py", "Final figures"),
     "09": ("09_generate_report.py", "Auto-generated Markdown report"),
 }
-
-FIGURE_RENAME_MAP = {
-    "Fig5_high_vs_low_rates.png": "Fig4_high_vs_low_rates.png",
-    "Fig10_central_mab_flux_heatmap.png": "Fig5_central_mab_flux_heatmap.png",
-    "Fig10B_central_mab_flux_zscore.png": "Fig6_central_mab_flux_zscore.png",
-    "Fig11_central_mab_flux_delta.png": "Fig7_central_mab_flux_delta.png",
-    "Fig15_pathway_scores_fva_overlap.png": "Fig8_pathway_scores_fva_overlap.png",
-    "Fig21_full_fva_high_low_separation.png": "Fig9_full_fva_high_low_separation.png",
-    "Fig21B_full_fva_range_delta.png": "Fig10_full_fva_range_delta.png",
-    "Fig8_summary_panel.png": "Fig11_summary_panel.png",
-    "Fig13_data_qc_overview.png": "SuppFig1_data_qc_overview.png",
-}
-
-# Legacy or retired files that should not remain in v1.0 output folders.
-RETIRED_FIGURES = {
-    "Fig4_fba_results.png",
-    "Fig7_ko_screen.png",
-    "Fig10_central_mab_flux_heatmap.png",
-    "Fig10B_central_mab_flux_zscore.png",
-    "Fig11_central_mab_flux_delta.png",
-    "Fig12_focused_core_fva_range.png",
-    "Fig12B_focused_core_fva_range_zscore.png",
-    "Fig12C_focused_fva_high_low_delta.png",
-    "Fig13_data_qc_overview.png",
-    "Fig14_interval_pathway_scores.png",
-    "Fig15_pathway_scores_fva_overlap.png",
-    "Fig21_full_fva_high_low_separation.png",
-    "Fig21B_full_fva_range_delta.png",
-    "Fig8_summary_panel.png",
-    "Fig5_high_vs_low_rates.png",
-}
-
-
-def _standardize_figures(dataset):
-    """Rename legacy figure outputs to the clean v1.0 figure numbering.
-
-    The computational step scripts intentionally remain close to the validated
-    development versions. This post-processing layer makes the user-facing output
-    folder clean and deterministic.
-    """
-    fig_dir = os.path.join(ROOT, "results", dataset, "figures")
-    if not os.path.isdir(fig_dir):
-        return
-
-    renamed = []
-    for old, new in FIGURE_RENAME_MAP.items():
-        old_path = os.path.join(fig_dir, old)
-        new_path = os.path.join(fig_dir, new)
-        if os.path.exists(old_path):
-            if os.path.exists(new_path):
-                os.remove(new_path)
-            shutil.move(old_path, new_path)
-            renamed.append((old, new))
-
-    # Remove stale legacy files left from previous runs in the same results folder.
-    for name in RETIRED_FIGURES:
-        path = os.path.join(fig_dir, name)
-        if os.path.exists(path):
-            try:
-                os.remove(path)
-            except Exception:
-                pass
-
-    if renamed:
-        print("  [figures] v1.0 filenames standardized:")
-        for old, new in renamed:
-            print(f"    {old} -> {new}")
-
 
 to_run = [x.strip().zfill(2) for x in args.steps.split(",") if x.strip()]
 
@@ -225,16 +156,12 @@ for step_id in to_run:
 
     if r.returncode == 0:
         print("  OK")
-        if step_id in {"00", "05", "06", "07", "08"}:
-            _standardize_figures(args.dataset)
     else:
         print(f"  ERROR -> {log}")
         for l in (r.stdout + r.stderr).strip().split("\n")[-12:]:
             if l.strip():
                 print(f"    {l}")
         break
-
-_standardize_figures(args.dataset)
 
 elapsed = time.time() - t_total
 print(f"\n{'=' * 76}\n  Done. {elapsed:.1f} sec")
