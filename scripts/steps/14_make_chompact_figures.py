@@ -171,6 +171,113 @@ def marker_size(coverage: pd.Series) -> pd.Series:
     return 45.0 + 1.55 * values
 
 
+def select_annotation_rows(
+    candidates: pd.DataFrame,
+    top_overall: int = 4,
+    top_model: int = 4,
+    top_measured: int = 3,
+) -> pd.DataFrame:
+    selections = [
+        candidates.nlargest(top_overall, "priority_score"),
+        candidates[candidates["evidence_type"].eq("model-emergent")].nlargest(
+            top_model,
+            "priority_score",
+        ),
+        candidates[candidates["evidence_type"].eq("measured")].nlargest(
+            top_measured,
+            "priority_score",
+        ),
+    ]
+    selected = pd.concat(selections, ignore_index=False)
+    selected = selected.sort_values(
+        ["priority_score", "confidence_score"],
+        ascending=False,
+        kind="stable",
+    )
+    return selected.drop_duplicates("label", keep="first")
+
+
+def annotate_in_lanes(ax: plt.Axes, rows: pd.DataFrame) -> None:
+    """Place selected labels in deterministic evidence-specific lanes."""
+    lane_specs = {
+        "model-emergent": {
+            "x": 0.04,
+            "start_y": 0.84,
+            "step_y": -0.042,
+            "ha": "left",
+        },
+        "measured": {
+            "x": 0.96,
+            "start_y": 0.61,
+            "step_y": -0.042,
+            "ha": "right",
+        },
+    }
+    for evidence, group in rows.groupby("evidence_type", sort=False):
+        spec = lane_specs.get(str(evidence), lane_specs["model-emergent"])
+        ordered = group.sort_values(
+            ["priority_score", "confidence_score"],
+            ascending=False,
+            kind="stable",
+        )
+        for lane_index, (_, row) in enumerate(ordered.iterrows()):
+            color = PATHWAY_COLORS.get(
+                str(row["pathway_family"]),
+                PATHWAY_COLORS["Other"],
+            )
+            label = str(row.get("chompact_subpathway", row["label"]))
+            ax.annotate(
+                label,
+                (float(row["priority_score"]), float(row["confidence_score"])),
+                xytext=(
+                    spec["x"],
+                    spec["start_y"] + lane_index * spec["step_y"],
+                ),
+                textcoords="axes fraction",
+                fontsize=7,
+                ha=spec["ha"],
+                va="center",
+                bbox={
+                    "boxstyle": "square,pad=0.12",
+                    "facecolor": "white",
+                    "edgecolor": "none",
+                    "alpha": 0.88,
+                },
+                arrowprops={
+                    "arrowstyle": "-",
+                    "color": color,
+                    "lw": 0.65,
+                    "alpha": 0.72,
+                    "shrinkA": 3,
+                    "shrinkB": 4,
+                },
+                annotation_clip=True,
+            )
+
+
+def metadata_caption(candidates: pd.DataFrame) -> str:
+    fields = [
+        ("fva_source", "FVA source"),
+        ("fva_scope", "scope"),
+        ("discovery_role", "role"),
+    ]
+    parts = []
+    for column, label in fields:
+        if column not in candidates.columns:
+            value = "unavailable"
+        else:
+            values = sorted(
+                {
+                    str(value)
+                    for value in candidates[column].dropna()
+                    if str(value).strip()
+                }
+            )
+            value = ", ".join(values) if values else "unavailable"
+        parts.append(f"{label}: {value}")
+    return " | ".join(parts)
+
+
 def save_priority_confidence(
     candidates: pd.DataFrame,
     fig_dir: str,
@@ -185,11 +292,17 @@ def save_priority_confidence(
     use = use[~use["high_low_difference_source"].eq("product_demand_driven")]
     if use.empty:
         return ""
-    use = use.sort_values("priority_score", ascending=False).head(20)
+    use = use.sort_values(
+        ["priority_score", "confidence_score"],
+        ascending=False,
+        kind="stable",
+    )
     use["label"] = use.apply(compact_label, axis=1)
     use["evidence_type"] = use.apply(evidence_type, axis=1)
     use["pathway_family"] = use.apply(pathway_family, axis=1)
     use["plot_size"] = marker_size(use["evidence_coverage_score"]).fillna(45.0)
+    annotation_rows = select_annotation_rows(use)
+    use["annotation_display"] = use.index.isin(annotation_rows.index)
 
     companion = use.rename(columns={
         "chompact_pathway": "pathway",
@@ -207,6 +320,7 @@ def save_priority_confidence(
         "pathway_family",
         "fva_source",
         "fva_scope",
+        "annotation_display",
     ]
     for col in companion_columns:
         if col not in companion.columns:
@@ -232,44 +346,27 @@ def save_priority_confidence(
             edgecolor="white",
             linewidth=0.8,
         )
-    annotation_rows = pd.concat(
-        [
-            use[use["evidence_type"].eq("measured")].nlargest(2, "priority_score"),
-            use[use["evidence_type"].eq("model-emergent")].nlargest(5, "priority_score"),
-        ],
-        ignore_index=True,
-    ).drop_duplicates(["chompact_pathway", "chompact_subpathway"])
-    annotation_offsets = [
-        (8, 14),
-        (8, -18),
-        (-88, 18),
-        (8, 25),
-        (-92, -18),
-        (8, -28),
-        (-95, 30),
-    ]
-    for index, (_, row) in enumerate(annotation_rows.iterrows()):
-        color = PATHWAY_COLORS.get(str(row["pathway_family"]), PATHWAY_COLORS["Other"])
-        short_label = str(row.get("chompact_subpathway", row["label"]))
-        offset = annotation_offsets[index % len(annotation_offsets)]
-        if float(row["priority_score"]) >= 90:
-            offset = (-10, 18 if index % 2 == 0 else -20)
-        ax.annotate(
-            short_label,
-            (row["priority_score"], row["confidence_score"]),
-            xytext=offset,
-            textcoords="offset points",
-            fontsize=7,
-            ha="left" if offset[0] > 0 else "right",
-            arrowprops={"arrowstyle": "-", "color": color, "lw": 0.7, "alpha": 0.8},
-        )
+    annotate_in_lanes(ax, annotation_rows)
     ax.axvline(60, color="#999999", lw=0.9, ls="--")
     ax.axhline(60, color="#999999", lw=0.9, ls="--")
     ax.set_xlim(0, 105)
     ax.set_ylim(0, 105)
     ax.set_xlabel("Priority score")
     ax.set_ylabel("Confidence score")
-    ax.set_title("Figure 14. Candidate Pathway Priority and Confidence")
+    ax.set_title(
+        "Figure 14. Candidate Pathway Priority and Confidence",
+        pad=28,
+    )
+    ax.text(
+        0.5,
+        1.012,
+        metadata_caption(use),
+        transform=ax.transAxes,
+        ha="center",
+        va="bottom",
+        fontsize=8,
+        color="#555555",
+    )
     ax.grid(True, ls=":", alpha=0.35)
     evidence_handles = [
         Line2D(
