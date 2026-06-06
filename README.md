@@ -161,6 +161,34 @@ results/<dataset>/REPORT_SUMMARY.md
 results/<dataset>/figures/Fig11_summary_panel.png
 ```
 
+## Optional v1.1 CHOmpact interpretation
+
+Steps 10-14 interpret existing iCHO3K outputs. CHOmpact does not
+recalculate fluxes.
+
+```bash
+python run_pipeline.py \
+  --dataset practice_20aa \
+  --steps 10,11,12,13,14 \
+  --fva_source auto
+```
+
+`--fva_source auto` uses full all/internal FVA when available and otherwise
+falls back to focused FVA. Use `full` to require broad-discovery FVA or
+`focused` to explicitly run confirmation-only interpretation.
+
+Release-blocker audit outputs:
+
+```text
+results/<dataset>/tables/chompact/chompact_domain_coverage_audit.csv
+results/<dataset>/tables/chompact/Fig14_candidate_pathway_priority_confidence_data.csv
+results/<dataset>/figures/Fig14_candidate_pathway_priority_confidence.png
+```
+
+All CHOmpact ranking outputs record `fva_source`, `fva_scope`, and
+`discovery_role`. Missing evidence remains unavailable rather than being
+interpreted as zero activity.
+
 ## Legacy step-number mapping
 
 The previous development branch used non-sequential step numbers. v1.0 uses only `00` through `09`.

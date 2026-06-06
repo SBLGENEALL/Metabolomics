@@ -55,6 +55,7 @@ PROVENANCE_COLUMNS = [
     "decision_role",
     "interpretation_guardrail",
 ]
+FVA_METADATA_COLUMNS = ["fva_source", "fva_scope", "discovery_role"]
 
 PRODUCT_DEMAND_REACTIONS = {
     "DM_igg_g",
@@ -260,6 +261,91 @@ def find_first(paths: List[str]) -> Optional[str]:
     return None
 
 
+def readable_csv(path: Optional[str]) -> bool:
+    if not path or not os.path.exists(path) or os.path.getsize(path) == 0:
+        return False
+    try:
+        return not pd.read_csv(path, nrows=3).empty
+    except (pd.errors.EmptyDataError, OSError, ValueError):
+        return False
+
+
+def resolve_fva_source(
+    tables: str,
+    requested: str,
+    scope: str,
+    explicit_table: Optional[str],
+) -> tuple:
+    full_candidates = []
+    for candidate_scope in dict.fromkeys([scope, "all", "internal"]):
+        if candidate_scope in {"all", "internal"}:
+            full_candidates.append(
+                (
+                    os.path.join(
+                        tables,
+                        "full_fva",
+                        f"full_fva_{candidate_scope}_combined_report.csv",
+                    ),
+                    candidate_scope,
+                )
+            )
+    focused_path = os.path.join(tables, "central_mab_fva_report.csv")
+
+    if explicit_table:
+        if not readable_csv(explicit_table):
+            raise FileNotFoundError(f"Requested FVA table is missing or empty: {explicit_table}")
+        name = os.path.basename(explicit_table).lower()
+        if "full_fva_" in name:
+            inferred_scope = next(
+                (x for x in ["all", "internal", "exchange", "focused"] if f"_{x}_" in name),
+                scope,
+            )
+            return explicit_table, "full_fva", inferred_scope, "broad_discovery"
+        return explicit_table, "focused_fva", "central_mab_panel", "focused_confirmation"
+
+    full_match = next(((path, item_scope) for path, item_scope in full_candidates if readable_csv(path)), None)
+    focused_available = readable_csv(focused_path)
+
+    if requested == "full":
+        if not full_match:
+            checked = ", ".join(path for path, _ in full_candidates)
+            raise FileNotFoundError(
+                "Full FVA was required but no non-empty all/internal combined report was found. "
+                f"Checked: {checked}"
+            )
+        return full_match[0], "full_fva", full_match[1], "broad_discovery"
+    if requested == "focused":
+        if not focused_available:
+            raise FileNotFoundError(
+                f"Focused FVA was required but is missing or empty: {focused_path}"
+            )
+        return focused_path, "focused_fva", "central_mab_panel", "focused_confirmation"
+    if full_match:
+        return full_match[0], "full_fva", full_match[1], "broad_discovery"
+    if focused_available:
+        return focused_path, "focused_fva", "central_mab_panel", "focused_confirmation"
+    raise FileNotFoundError(
+        "No usable FVA input was found. Run step 06 for full FVA or step 05 for focused FVA."
+    )
+
+
+def add_fva_metadata(
+    df: pd.DataFrame,
+    source: str,
+    scope: str,
+    role: str,
+) -> pd.DataFrame:
+    out = df.copy()
+    if out.empty:
+        for col in FVA_METADATA_COLUMNS:
+            out[col] = pd.Series(dtype="object")
+        return out
+    out["fva_source"] = source
+    out["fva_scope"] = scope
+    out["discovery_role"] = role
+    return out
+
+
 def make_qc(mapped: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     rows = []
     for name, df in mapped.items():
@@ -293,6 +379,12 @@ def main() -> None:
     parser.add_argument("--flux_table", default=None)
     parser.add_argument("--fva_table", default=None)
     parser.add_argument("--full_fva_scope", default=os.environ.get("CHO_FVA_SCOPE", "all"))
+    parser.add_argument(
+        "--fva_source",
+        default=os.environ.get("CHO_FVA_SOURCE", "auto"),
+        choices=["auto", "full", "focused"],
+        help="FVA source for CHOmpact interpretation; auto prefers full all/internal FVA.",
+    )
     args = parser.parse_args()
 
     tables = results_dir(args.dataset, "tables")
@@ -304,27 +396,57 @@ def main() -> None:
         os.path.join(tables, "central_mab_flux_state.csv"),
         os.path.join(tables, "fba_results.csv"),
     ])
-    focused_fva_path = args.fva_table or find_first([
-        os.path.join(tables, "central_mab_fva_report.csv"),
-        os.path.join(tables, "full_fva", f"full_fva_{args.full_fva_scope}_combined_report.csv"),
-        os.path.join(tables, "full_fva", "full_fva_all_combined_report.csv"),
-    ])
-    overlap_path = find_first([
-        os.path.join(tables, "full_fva", f"full_fva_{args.full_fva_scope}_high_low_overlap.csv"),
-        os.path.join(tables, "full_fva", "full_fva_all_high_low_overlap.csv"),
-        os.path.join(tables, "central_mab_fva_high_low_overlap.csv"),
-    ])
+    try:
+        fva_path, fva_source, fva_scope, discovery_role = resolve_fva_source(
+            tables,
+            args.fva_source,
+            args.full_fva_scope,
+            args.fva_table,
+        )
+    except FileNotFoundError as exc:
+        parser.error(str(exc))
+    if fva_source == "full_fva":
+        overlap_path = find_first([
+            os.path.join(tables, "full_fva", f"full_fva_{fva_scope}_high_low_overlap.csv"),
+            os.path.join(tables, "full_fva", "full_fva_all_high_low_overlap.csv"),
+            os.path.join(tables, "full_fva", "full_fva_internal_high_low_overlap.csv"),
+        ])
+    else:
+        overlap_path = find_first([
+            os.path.join(tables, "central_mab_fva_high_low_overlap.csv"),
+            os.path.join(tables, "fva_high_low_overlap_separation.csv"),
+        ])
     rate_path = os.path.join(tables, "exchange_rates.csv")
 
-    mapped_flux = attach_mapping(read_csv_if_exists(flux_path), mapping, "model_predicted_flux")
-    mapped_fva = attach_mapping(read_csv_if_exists(focused_fva_path), mapping, "model_predicted_fva")
-    mapped_overlap = attach_mapping(read_csv_if_exists(overlap_path), mapping, "model_predicted_fva_overlap")
+    mapped_flux = add_fva_metadata(
+        attach_mapping(read_csv_if_exists(flux_path), mapping, "model_predicted_flux"),
+        fva_source,
+        fva_scope,
+        discovery_role,
+    )
+    mapped_fva = add_fva_metadata(
+        attach_mapping(read_csv_if_exists(fva_path), mapping, "model_predicted_fva"),
+        fva_source,
+        fva_scope,
+        discovery_role,
+    )
+    mapped_overlap = add_fva_metadata(
+        attach_mapping(read_csv_if_exists(overlap_path), mapping, "model_predicted_fva_overlap"),
+        fva_source,
+        fva_scope,
+        discovery_role,
+    )
 
     rates = read_csv_if_exists(rate_path)
     mapped_rates = pd.DataFrame()
     if not rates.empty:
         rates = rates.rename(columns={"exchange_id": "reaction_id"})
-        mapped_rates = attach_mapping(rates, mapping, "measured_exchange_rate")
+        mapped_rates = add_fva_metadata(
+            attach_mapping(rates, mapping, "measured_exchange_rate"),
+            fva_source,
+            fva_scope,
+            discovery_role,
+        )
 
     outputs = {
         "mapped_flux": mapped_flux,
@@ -343,6 +465,10 @@ def main() -> None:
             df.to_csv(os.path.join(chompact_dir, filenames[key]), index=False)
 
     qc = make_qc(outputs)
+    qc["fva_source"] = fva_source
+    qc["fva_scope"] = fva_scope
+    qc["discovery_role"] = discovery_role
+    qc["selected_fva_table"] = os.path.relpath(fva_path, ROOT)
     qc.to_csv(os.path.join(chompact_dir, "chompact_mapping_qc.csv"), index=False)
     non_empty = [normalize_reaction_id(df) for df in outputs.values() if not df.empty]
     unmapped = pd.concat(non_empty, ignore_index=True) if non_empty else pd.DataFrame()
@@ -352,6 +478,12 @@ def main() -> None:
         unmapped.to_csv(os.path.join(chompact_dir, "chompact_unmapped_reactions.csv"), index=False)
 
     print(f"[saved] {os.path.relpath(chompact_dir, ROOT)}")
+    print(
+        f"[fva source] source={fva_source} scope={fva_scope} "
+        f"role={discovery_role} table={os.path.relpath(fva_path, ROOT)}"
+    )
+    if fva_source == "focused_fva":
+        print("[limitation] focused FVA supports confirmation only; broad pathway discovery is unavailable.")
     print(qc.to_string(index=False))
 
 

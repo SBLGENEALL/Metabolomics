@@ -23,6 +23,12 @@ parser.add_argument("--fva_scope", default="all", choices=["exchange", "focused"
 parser.add_argument("--fva_targets", default="group_avg", choices=["group_avg", "representative", "all_clones"])
 parser.add_argument("--fva_processes", type=int, default=16)
 parser.add_argument("--fva_fraction", type=float, default=None)
+parser.add_argument(
+    "--fva_source",
+    default="auto",
+    choices=["auto", "full", "focused"],
+    help="FVA source for CHOmpact steps 10-14; auto prefers full all/internal FVA.",
+)
 args = parser.parse_args()
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -139,6 +145,7 @@ env["CHO_FEED_VOLUME_MODE"] = args.feed_volume_mode
 env["CHO_FVA_SCOPE"] = args.fva_scope
 env["CHO_FVA_TARGETS"] = args.fva_targets
 env["CHO_FVA_PROCESSES"] = str(args.fva_processes)
+env["CHO_FVA_SOURCE"] = args.fva_source
 
 if args.objective:
     env["CHO_OBJECTIVE"] = args.objective
@@ -153,7 +160,10 @@ print(f"  Rate Day {args.rate_days.replace(',', '->')} | Steps {','.join(to_run)
 print(f"  Objective: {args.objective or 'DM_igg_g'} | analysis_mode: {args.analysis_mode}")
 print(f"  Constraint policy: {args.constraint_policy} | Feed volume mode: {args.feed_volume_mode} | Input: {args.input_format}")
 print(f"  demand_scale: {args.demand_scale} | biomass_fraction: {args.biomass_fraction if args.biomass_fraction is not None else 'config default'}")
-print(f"  FVA: scope={args.fva_scope}, targets={args.fva_targets}, processes={args.fva_processes}")
+print(
+    f"  FVA: scope={args.fva_scope}, targets={args.fva_targets}, "
+    f"processes={args.fva_processes}, CHOmpact source={args.fva_source}"
+)
 print("  Product sequence module: excluded from main workflow")
 print("  KO screening / direct objective-ranking figures: excluded from main workflow")
 print("=" * 76)
@@ -213,6 +223,12 @@ for step_id in to_run:
         ]
         if args.fva_fraction is not None:
             cmd += ["--fraction", str(args.fva_fraction)]
+
+    if step_id == "10":
+        cmd += [
+            "--fva_source", args.fva_source,
+            "--full_fva_scope", args.fva_scope,
+        ]
 
     log = os.path.join(LOGS_DIR, f"{step_id}_{script.replace('.py', '')}_{args.dataset}.log")
 

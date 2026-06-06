@@ -14,6 +14,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
+from matplotlib.lines import Line2D  # noqa: E402
 
 
 def _repo_root() -> str:
@@ -35,6 +36,20 @@ EVIDENCE_COLORS = {
     "measured_pathway_screening_signature": "#0072B2",
     "model_emergent_pathway_hypothesis": "#D55E00",
     "demand_conditioned_explanation": "#8A8A8A",
+}
+
+PATHWAY_COLORS = {
+    "TCA": "#0072B2",
+    "PPP": "#009E73",
+    "OXPHOS": "#CC79A7",
+    "Glutamine": "#E69F00",
+    "Exchange": "#56B4E9",
+    "Other": "#777777",
+}
+
+EVIDENCE_MARKERS = {
+    "model-emergent": "o",
+    "measured": "^",
 }
 
 
@@ -124,7 +139,43 @@ def save_model_robustness(model_pathways: pd.DataFrame, fig_dir: str) -> str:
     return path
 
 
-def save_priority_confidence(candidates: pd.DataFrame, fig_dir: str) -> str:
+def pathway_family(row: pd.Series) -> str:
+    text = " ".join(
+        str(row.get(col, ""))
+        for col in ["chompact_pathway", "chompact_subpathway", "reaction_id"]
+    ).lower()
+    evidence_type = str(row.get("evidence_type", "")).lower()
+    if evidence_type == "measured" or "exchange" in text or "uptake" in text:
+        return "Exchange"
+    if "pentose" in text or "ppp" in text:
+        return "PPP"
+    if "tca" in text or "citrate" in text or "anapler" in text:
+        return "TCA"
+    if any(token in text for token in ["oxidative phosphorylation", "complex i", "complex iii", "complex iv", "atp synthase"]):
+        return "OXPHOS"
+    if "glutamine" in text or "glutamate" in text:
+        return "Glutamine"
+    return "Other"
+
+
+def evidence_type(row: pd.Series) -> str:
+    candidate_type = str(row.get("candidate_type", "")).lower()
+    observability = str(row.get("evidence_observability", "")).lower()
+    if "measured" in candidate_type or observability == "measured":
+        return "measured"
+    return "model-emergent"
+
+
+def marker_size(coverage: pd.Series) -> pd.Series:
+    values = pd.to_numeric(coverage, errors="coerce").clip(lower=0, upper=100)
+    return 45.0 + 1.55 * values
+
+
+def save_priority_confidence(
+    candidates: pd.DataFrame,
+    fig_dir: str,
+    chompact_dir: str,
+) -> str:
     if candidates.empty:
         return ""
     use = candidates.copy()
@@ -136,34 +187,82 @@ def save_priority_confidence(candidates: pd.DataFrame, fig_dir: str) -> str:
         return ""
     use = use.sort_values("priority_score", ascending=False).head(20)
     use["label"] = use.apply(compact_label, axis=1)
-    fig, ax = plt.subplots(figsize=(8.5, 6.4))
-    for candidate_type, group in use.groupby("candidate_type", dropna=False):
-        color = EVIDENCE_COLORS.get(candidate_type, "#777777")
-        size = 45 + 1.3 * pd.to_numeric(
-            group.get("evidence_coverage_score", 50),
-            errors="coerce",
-        ).fillna(50)
+    use["evidence_type"] = use.apply(evidence_type, axis=1)
+    use["pathway_family"] = use.apply(pathway_family, axis=1)
+    use["plot_size"] = marker_size(use["evidence_coverage_score"]).fillna(45.0)
+
+    companion = use.rename(columns={
+        "chompact_pathway": "pathway",
+        "chompact_subpathway": "subpathway",
+    })
+    companion_columns = [
+        "pathway",
+        "subpathway",
+        "priority_score",
+        "confidence_score",
+        "evidence_coverage_score",
+        "mapping_coverage_score",
+        "robustness_score",
+        "evidence_type",
+        "pathway_family",
+        "fva_source",
+        "fva_scope",
+    ]
+    for col in companion_columns:
+        if col not in companion.columns:
+            companion[col] = np.nan
+    companion[companion_columns].to_csv(
+        os.path.join(chompact_dir, "Fig14_candidate_pathway_priority_confidence_data.csv"),
+        index=False,
+    )
+
+    fig, ax = plt.subplots(figsize=(11.5, 7.2))
+    for (evidence, family), group in use.groupby(
+        ["evidence_type", "pathway_family"],
+        dropna=False,
+    ):
+        color = PATHWAY_COLORS.get(str(family), PATHWAY_COLORS["Other"])
         ax.scatter(
             group["priority_score"],
             group["confidence_score"],
-            s=size,
+            s=group["plot_size"],
             color=color,
+            marker=EVIDENCE_MARKERS.get(str(evidence), "o"),
             alpha=0.78,
             edgecolor="white",
             linewidth=0.8,
-            label=str(candidate_type).replace("_", " "),
         )
-        annotation_offsets = [(5, 10), (5, -13), (5, 22)]
-        for index, (_, row) in enumerate(group.sort_values("priority_score", ascending=False).head(3).iterrows()):
-            short_label = str(row.get("chompact_subpathway", row["label"]))
-            ax.annotate(
-                short_label,
-                (row["priority_score"], row["confidence_score"]),
-                xytext=annotation_offsets[index],
-                textcoords="offset points",
-                fontsize=7,
-                arrowprops={"arrowstyle": "-", "color": color, "lw": 0.6, "alpha": 0.7},
-            )
+    annotation_rows = pd.concat(
+        [
+            use[use["evidence_type"].eq("measured")].nlargest(2, "priority_score"),
+            use[use["evidence_type"].eq("model-emergent")].nlargest(5, "priority_score"),
+        ],
+        ignore_index=True,
+    ).drop_duplicates(["chompact_pathway", "chompact_subpathway"])
+    annotation_offsets = [
+        (8, 14),
+        (8, -18),
+        (-88, 18),
+        (8, 25),
+        (-92, -18),
+        (8, -28),
+        (-95, 30),
+    ]
+    for index, (_, row) in enumerate(annotation_rows.iterrows()):
+        color = PATHWAY_COLORS.get(str(row["pathway_family"]), PATHWAY_COLORS["Other"])
+        short_label = str(row.get("chompact_subpathway", row["label"]))
+        offset = annotation_offsets[index % len(annotation_offsets)]
+        if float(row["priority_score"]) >= 90:
+            offset = (-10, 18 if index % 2 == 0 else -20)
+        ax.annotate(
+            short_label,
+            (row["priority_score"], row["confidence_score"]),
+            xytext=offset,
+            textcoords="offset points",
+            fontsize=7,
+            ha="left" if offset[0] > 0 else "right",
+            arrowprops={"arrowstyle": "-", "color": color, "lw": 0.7, "alpha": 0.8},
+        )
     ax.axvline(60, color="#999999", lw=0.9, ls="--")
     ax.axhline(60, color="#999999", lw=0.9, ls="--")
     ax.set_xlim(0, 105)
@@ -172,8 +271,60 @@ def save_priority_confidence(candidates: pd.DataFrame, fig_dir: str) -> str:
     ax.set_ylabel("Confidence score")
     ax.set_title("Figure 14. Candidate Pathway Priority and Confidence")
     ax.grid(True, ls=":", alpha=0.35)
-    ax.legend(loc="lower right", fontsize=8)
-    fig.tight_layout()
+    evidence_handles = [
+        Line2D(
+            [0],
+            [0],
+            marker=marker,
+            color="none",
+            markerfacecolor="#555555",
+            markeredgecolor="white",
+            markersize=8,
+            label=label,
+        )
+        for label, marker in EVIDENCE_MARKERS.items()
+    ]
+    pathway_handles = [
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="none",
+            markerfacecolor=color,
+            markeredgecolor="white",
+            markersize=8,
+            label=family,
+        )
+        for family, color in PATHWAY_COLORS.items()
+    ]
+    coverage_handles = [
+        ax.scatter([], [], s=float(marker_size(pd.Series([coverage])).iloc[0]), color="#999999", alpha=0.65, label=f"{coverage}%")
+        for coverage in [25, 50, 100]
+    ]
+    evidence_legend = ax.legend(
+        handles=evidence_handles,
+        title="Evidence type",
+        loc="upper left",
+        bbox_to_anchor=(1.01, 1.0),
+        fontsize=8,
+    )
+    ax.add_artist(evidence_legend)
+    pathway_legend = ax.legend(
+        handles=pathway_handles,
+        title="Pathway family",
+        loc="center left",
+        bbox_to_anchor=(1.01, 0.53),
+        fontsize=8,
+    )
+    ax.add_artist(pathway_legend)
+    ax.legend(
+        handles=coverage_handles,
+        title="Evidence coverage",
+        loc="lower left",
+        bbox_to_anchor=(1.01, 0.0),
+        fontsize=8,
+    )
+    fig.tight_layout(rect=(0, 0, 0.82, 1))
     path = os.path.join(fig_dir, "Fig14_candidate_pathway_priority_confidence.png")
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
@@ -325,7 +476,7 @@ def main() -> None:
     paths = [
         save_measured_markers(measured, fig_dir),
         save_model_robustness(model, fig_dir),
-        save_priority_confidence(candidates, fig_dir),
+        save_priority_confidence(candidates, fig_dir, chompact_dir),
     ]
     write_summary(args.dataset, chompact_dir, paths, measured, model, demand)
     update_main_report(args.dataset, paths)

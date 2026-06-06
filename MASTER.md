@@ -214,7 +214,34 @@ The v1.1 branch adds optional interpretation steps after v1.0.
 Run v1.1 extension after v1.0 outputs already exist:
 
 ```bash
-python run_pipeline.py --dataset practice_20aa --steps 10,11,12,13,14
+python run_pipeline.py \
+  --dataset practice_20aa \
+  --steps 10,11,12,13,14 \
+  --fva_source auto
+```
+
+CHOmpact FVA source policy:
+
+```text
+--fva_source auto
+  = prefer non-empty full FVA from all/internal scope
+  = fall back to focused central/mAb FVA
+
+--fva_source full
+  = require full all/internal FVA
+  = fail clearly when unavailable
+
+--fva_source focused
+  = use central/mAb focused FVA only
+  = label results as focused confirmation with limited discovery coverage
+```
+
+All CHOmpact ranking outputs carry:
+
+```text
+fva_source
+fva_scope
+discovery_role
 ```
 
 Run v1.0 plus v1.1 together:
@@ -308,6 +335,8 @@ chompact_demand_scale_sensitivity.csv
 chompact_robust_rank_across_demand_scales.csv
 chompact_ranked_pathway_biomarkers.csv
 chompact_top_pathway_biomarkers_for_report.csv
+chompact_domain_coverage_audit.csv
+Fig14_candidate_pathway_priority_confidence_data.csv
 CHOmpact_v1_1_executive_summary.md
 ```
 
@@ -392,6 +421,8 @@ Primary output files should be documented by biological meaning, modeling role, 
 | `chompact_robust_rank_across_demand_scales.csv` | Candidate/pathway ranking stability across demand scales. | Model robustness evidence. | Identify candidates that persist across product-demand assumptions. |
 | `chompact_ranked_pathway_biomarkers.csv` | Main ranked CHOmpact candidate table with priority/confidence/evidence annotations. | Mixed evidence, explicitly classified. | Final screening-marker and engineering-target triage. |
 | `chompact_top_pathway_biomarkers_for_report.csv` | Short report-facing subset of ranked CHOmpact candidates. | Mixed evidence, explicitly classified. | Executive summary and Fig14 input. |
+| `chompact_domain_coverage_audit.csv` | Domain-level audit from iCHO3K model coverage through focused/full FVA, mapping, scoring, and ranking. | Coverage/QC evidence. | Distinguish absent activity from unavailable or insufficiently mapped biology. |
+| `Fig14_candidate_pathway_priority_confidence_data.csv` | Exact plotted data and visual encodings for Fig14. | Mixed evidence, explicitly classified. | Audit priority, confidence, coverage, evidence type, pathway family, and FVA source. |
 | `CHOmpact_v1_1_executive_summary.md` | Human-readable v1.1 CHOmpact interpretation summary. | Narrative summary. | Review, communication, and release validation. |
 
 ---
@@ -435,6 +466,50 @@ FVA ranges are model-based feasible ranges, not direct intracellular flux measur
 
 If a High-vs-Low difference is directly imposed as a boundary constraint, it is constraint-driven and should be reported descriptively. Interior differences that persist after boundary equalization or demand-attribution checks may be treated as emergent model hypotheses.
 
+### Confidence and coverage rules
+
+The five decision metrics remain separate:
+
+```text
+priority_score
+confidence_score
+evidence_coverage_score
+mapping_coverage_score
+robustness_score
+```
+
+`evidence_coverage_score` is calculated as available evidence divided by expected
+evidence. Missing evidence remains `NA`; it is not converted to zero. Missing
+evidence lowers coverage and may limit confidence.
+
+Current conservative confidence caps:
+
+```text
+focused FVA only          -> confidence_score <= 70
+mapping coverage < 20%    -> confidence_score <= 50
+no FVA evidence           -> confidence_score <= 60
+```
+
+Model-only candidates remain classified as model-emergent hypotheses regardless
+of score. These caps prevent focused or poorly mapped evidence from appearing as
+broad, high-confidence pathway discovery.
+
+### Coverage audit interpretation
+
+The domain coverage audit uses only these status values:
+
+```text
+adequately_covered
+partially_covered
+mapping_missing
+full_fva_only
+not_evaluated
+unavailable
+```
+
+`mapping_missing`, `full_fva_only`, `not_evaluated`, and `unavailable` must never
+be interpreted as zero pathway activity.
+
 ---
 
 ## 13. Release-polish checklist for v1.1-pr1
@@ -472,6 +547,25 @@ hover / annotation fields:
 ```
 
 Fig14 should not show only priority and confidence. Evidence type and pathway coverage must be visible either directly in the figure or in hover/label/exported table fields.
+
+Implemented Fig14 encoding:
+
+```text
+shape:
+  circle = model-emergent
+  triangle = measured
+
+color:
+  TCA
+  PPP
+  OXPHOS
+  Glutamine
+  Exchange
+  Other
+
+size:
+  evidence_coverage_score
+```
 
 ### Coverage audit
 

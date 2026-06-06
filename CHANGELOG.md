@@ -71,19 +71,34 @@ Metabolomics_v1.1
 - `IMPLEMENTATION_PLAN.md`
 - `docs/biological_interpretation_guide.md`
 - CHOmpact executive summary output concept
+- Explicit `auto`, `full`, and `focused` FVA source selection for steps 10-14
+- FVA provenance fields in all CHOmpact ranking outputs
+- `chompact_domain_coverage_audit.csv` for release coverage review
+- Fig14 priority-confidence scatter with evidence type, pathway family, and
+  evidence coverage encodings
+- Fig14 companion data table for traceable figure generation
 
 ### Changed
 
 - `run_pipeline.py` can now dispatch optional v1.1 steps 10-14
 - CHOmpact is formally treated as an interpretation and visualization layer, not a calculation model
+- Priority, confidence, evidence coverage, mapping coverage, and robustness are
+  retained as separate metrics
+- Missing evidence remains NA and reduces evidence coverage
+- Confidence is capped for focused-only FVA, low mapping coverage, or missing FVA
+- Product-demand-driven reactions remain explanatory and are excluded from
+  predictive biomarker ranking
 - Development branch naming policy changed from descriptive feature names to version branches such as `v1.1`, `v1.2`, and subtask branches such as `v1.1-pr1`
 
 ### Current validation status
 
-- Step 10-14 smoke test: PASS when run without crashing
-- Full biological/data validation: pending
-- Current issue: v1.1 outputs can be empty if v1.0 tables are missing or mapping coverage is low
-- Current issue: FVA console/log output can show repeated earlier `!! FVA failed` messages before final success, which is confusing and should be cleaned before v1.1 release
+- `practice_20aa` steps 08-14: PASS
+- Focused FVA fallback and provenance propagation: PASS
+- Fig14 and companion CSV generation: PASS
+- Domain coverage audit generation: PASS
+- v1.0 steps 00-07 calculation smoke validation: PASS
+- Full all/internal FVA remains the preferred broad-discovery source on the
+  validated Linux workstation route
 
 ### v1.1 release criteria
 

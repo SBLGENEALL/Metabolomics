@@ -12,7 +12,10 @@ The output language is deliberately conservative:
 Product-demand-driven IgG reactions are excluded from predictive rankings.
 """
 import argparse
+import glob
+import json
 import os
+import re
 import sys
 
 import numpy as np
@@ -31,7 +34,7 @@ def _repo_root() -> str:
 ROOT = _repo_root()
 sys.path.insert(0, ROOT)
 
-from src.config import results_dir  # noqa: E402
+from src.config import MODEL_PATH, results_dir  # noqa: E402
 
 
 PROVENANCE_COLUMNS = [
@@ -41,6 +44,28 @@ PROVENANCE_COLUMNS = [
     "decision_role",
     "interpretation_guardrail",
 ]
+FVA_METADATA_COLUMNS = ["fva_source", "fva_scope", "discovery_role"]
+
+DOMAIN_PATTERNS = {
+    "PPP": re.compile(r"pentose phosphate|g6pdh|6-phosphoglucon|transketol|transaldol", re.I),
+    "nucleotide metabolism": re.compile(
+        r"nucleotide|purine|pyrimidine|adenyl|guanyl|urid|cytid|thymid",
+        re.I,
+    ),
+    "lipid metabolism": re.compile(
+        r"lipid|fatty acid|cholesterol|phospholipid|sphingo|ceramide|glycerolipid",
+        re.I,
+    ),
+    "glycosylation": re.compile(
+        r"glycosyl|glycan|oligosacchar|mannos|fucos|sialyl|galactosyl",
+        re.I,
+    ),
+    "nucleotide-sugar donor metabolism": re.compile(
+        r"nucleotide.?sugar|udp.?glc|udp.?gal|udp.?glcnac|udp.?galnac|"
+        r"gdp.?mann|gdp.?fuc|cmp.?sial",
+        re.I,
+    ),
+}
 
 
 def read(path: str) -> pd.DataFrame:
@@ -66,6 +91,50 @@ def mean_available(df: pd.DataFrame, columns: list) -> pd.Series:
     if not available:
         return pd.Series(np.nan, index=df.index, dtype=float)
     return df[available].apply(pd.to_numeric, errors="coerce").mean(axis=1, skipna=True)
+
+
+def availability_score(df: pd.DataFrame, columns: list) -> pd.Series:
+    available = [col for col in columns if col in df.columns]
+    if not columns:
+        return pd.Series(np.nan, index=df.index, dtype=float)
+    if not available:
+        return pd.Series(0.0, index=df.index, dtype=float)
+    return 100.0 * df[available].apply(pd.to_numeric, errors="coerce").notna().sum(axis=1) / len(columns)
+
+
+def apply_confidence_caps(df: pd.DataFrame, has_fva_column: str) -> pd.DataFrame:
+    out = df.copy()
+    raw = pd.to_numeric(out["confidence_score"], errors="coerce")
+    cap = pd.Series(100.0, index=out.index, dtype=float)
+    focused = out.get("fva_source", pd.Series("", index=out.index)).eq("focused_fva")
+    cap = cap.mask(focused, np.minimum(cap, 70.0))
+    mapping = pd.to_numeric(
+        out.get("mapping_coverage_score", pd.Series(np.nan, index=out.index)),
+        errors="coerce",
+    )
+    cap = cap.mask(mapping.lt(20.0), np.minimum(cap, 50.0))
+    has_fva = pd.to_numeric(
+        out.get(has_fva_column, pd.Series(np.nan, index=out.index)),
+        errors="coerce",
+    ).notna()
+    cap = cap.mask(~has_fva, np.minimum(cap, 60.0))
+    out["confidence_cap"] = cap
+    out["confidence_score"] = np.minimum(raw, cap)
+    return out
+
+
+def ensure_fva_metadata(df: pd.DataFrame) -> pd.DataFrame:
+    out = df.copy()
+    defaults = {
+        "fva_source": "unavailable",
+        "fva_scope": "unavailable",
+        "discovery_role": "not_evaluated",
+    }
+    for col, default in defaults.items():
+        if col not in out.columns:
+            out[col] = default
+        out[col] = out[col].fillna(default)
+    return out
 
 
 def ensure_columns(df: pd.DataFrame, columns: list) -> pd.DataFrame:
@@ -100,7 +169,11 @@ def build_measured_markers(measured: pd.DataFrame) -> pd.DataFrame:
     out["effect_magnitude"] = pd.to_numeric(out["standardized_high_low_effect"], errors="coerce")
     out["priority_score"] = percentile_score(out["effect_magnitude"])
     out["robustness_score"] = pd.to_numeric(out.get("robustness_score"), errors="coerce")
-    out["evidence_coverage_score"] = np.where(out["robustness_score"].notna(), 100.0, 50.0)
+    out = ensure_fva_metadata(out)
+    out["evidence_coverage_score"] = availability_score(
+        out,
+        ["effect_magnitude", "robustness_score"],
+    )
     out["confidence_score"] = mean_available(
         out,
         ["evidence_coverage_score", "mapping_coverage_score", "robustness_score"],
@@ -112,6 +185,7 @@ def build_measured_markers(measured: pd.DataFrame) -> pd.DataFrame:
         "evidence coverage + mapping coverage; reproducibility unavailable",
     )
     out["candidate_label"] = "candidate screening/feed-media marker"
+    out = apply_confidence_caps(out, "robustness_score")
     return out.sort_values(["priority_score", "confidence_score"], ascending=False)
 
 
@@ -128,6 +202,9 @@ def aggregate_model_pathways(separation: pd.DataFrame, demand: pd.DataFrame) -> 
     keys = ["chompact_pathway", "chompact_subpathway"]
     if "mode" in use.columns:
         keys.insert(0, "mode")
+    for col in FVA_METADATA_COLUMNS:
+        if col in use.columns:
+            keys.append(col)
     fba = use[use["metric_family"].eq("FBA")].copy()
     fva = use[use["metric_family"].eq("FVA")].copy()
 
@@ -182,9 +259,6 @@ def aggregate_model_pathways(separation: pd.DataFrame, demand: pd.DataFrame) -> 
     out["fva_priority_component"] = percentile_score(out.get("fva_non_overlap_score", pd.Series(np.nan, index=out.index)))
     out["priority_score"] = mean_available(out, ["fba_priority_component", "fva_priority_component"])
     out["hypothesis_ranking_score"] = out["priority_score"]
-    out["evidence_coverage_score"] = 100.0 * out[
-        ["fba_normalized_effect", "fva_non_overlap_score"]
-    ].notna().mean(axis=1)
     out["mapping_coverage_score"] = mean_available(
         out,
         ["fba_mapping_coverage_score", "fva_mapping_coverage_score"],
@@ -202,6 +276,10 @@ def aggregate_model_pathways(separation: pd.DataFrame, demand: pd.DataFrame) -> 
         out["demand_stability_score"] = stability
     else:
         out["demand_stability_score"] = np.nan
+    out["evidence_coverage_score"] = availability_score(
+        out,
+        ["fba_normalized_effect", "fva_non_overlap_score", "demand_stability_score"],
+    )
     out["confidence_score"] = mean_available(
         out,
         [
@@ -225,6 +303,8 @@ def aggregate_model_pathways(separation: pd.DataFrame, demand: pd.DataFrame) -> 
             out[col] = default
         out[col] = out[col].fillna(default)
     out["confidence_basis"] = "available evidence coverage + mapping + FVA robustness + demand stability"
+    out = ensure_fva_metadata(out)
+    out = apply_confidence_caps(out, "fva_non_overlap_score")
     return out.sort_values(["priority_score", "confidence_score"], ascending=False)
 
 
@@ -243,6 +323,9 @@ def build_demand_explanations(reaction_sep: pd.DataFrame) -> pd.DataFrame:
     keys = ["reaction_id", "chompact_pathway", "chompact_subpathway"]
     if "mode" in use.columns:
         keys.insert(0, "mode")
+    for col in FVA_METADATA_COLUMNS:
+        if col in use.columns:
+            keys.append(col)
     fba = use[use["metric_family"].eq("FBA")].copy()
     fva = use[use["metric_family"].eq("FVA")].copy()
     fba_keep = keys + ["normalized_effect", "delta_a_minus_b", "mapping_status"] + PROVENANCE_COLUMNS
@@ -259,9 +342,10 @@ def build_demand_explanations(reaction_sep: pd.DataFrame) -> pd.DataFrame:
     out["fva_component"] = percentile_score(out["fva_non_overlap_score"])
     out["priority_score"] = mean_available(out, ["effect_component", "fva_component"])
     out["hypothesis_ranking_score"] = np.nan
-    out["evidence_coverage_score"] = 100.0 * out[
-        ["fba_normalized_effect", "fva_non_overlap_score"]
-    ].notna().mean(axis=1)
+    out["evidence_coverage_score"] = availability_score(
+        out,
+        ["fba_normalized_effect", "fva_non_overlap_score"],
+    )
     mapping_status = (
         out["mapping_status"]
         if "mapping_status" in out.columns
@@ -290,6 +374,8 @@ def build_demand_explanations(reaction_sep: pd.DataFrame) -> pd.DataFrame:
         out[col] = out[col].fillna(default)
     out["decision_role"] = "do_not_rank_as_predictive"
     out["predictive_ranking_eligible"] = False
+    out = ensure_fva_metadata(out)
+    out = apply_confidence_caps(out, "fva_non_overlap_score")
     return out.sort_values(["priority_score", "confidence_score"], ascending=False)
 
 
@@ -306,9 +392,12 @@ def aggregate_model_reactions(reaction_sep: pd.DataFrame) -> pd.DataFrame:
     keys = ["reaction_id", "chompact_pathway", "chompact_subpathway"]
     if "mode" in use.columns:
         keys.insert(0, "mode")
+    for col in FVA_METADATA_COLUMNS:
+        if col in use.columns:
+            keys.append(col)
     fba = use[use["metric_family"].eq("FBA")].copy()
     fva = use[use["metric_family"].eq("FVA")].copy()
-    fba_keep = keys + ["normalized_effect", "delta_a_minus_b", "abs_delta"] + PROVENANCE_COLUMNS
+    fba_keep = keys + ["normalized_effect", "delta_a_minus_b", "abs_delta", "mapping_status"] + PROVENANCE_COLUMNS
     fva_keep = keys + ["fva_non_overlap_score", "normalized_effect"]
     fba = ensure_columns(fba, fba_keep)[fba_keep].rename(columns={
         "normalized_effect": "fba_normalized_effect",
@@ -323,8 +412,11 @@ def aggregate_model_reactions(reaction_sep: pd.DataFrame) -> pd.DataFrame:
     out["fva_priority_component"] = percentile_score(out["fva_non_overlap_score"])
     out["priority_score"] = mean_available(out, ["fba_priority_component", "fva_priority_component"])
     out["hypothesis_ranking_score"] = out["priority_score"]
-    out["evidence_coverage_score"] = 100.0 * out[["fba_normalized_effect", "fva_non_overlap_score"]].notna().mean(axis=1)
-    out["mapping_coverage_score"] = 100.0
+    out["evidence_coverage_score"] = availability_score(
+        out,
+        ["fba_normalized_effect", "fva_non_overlap_score"],
+    )
+    out["mapping_coverage_score"] = np.where(out["mapping_status"].eq("mapped"), 100.0, 0.0)
     out["robustness_score"] = 100.0 * pd.to_numeric(out["fva_non_overlap_score"], errors="coerce")
     out["confidence_score"] = mean_available(
         out,
@@ -344,6 +436,8 @@ def aggregate_model_reactions(reaction_sep: pd.DataFrame) -> pd.DataFrame:
             out[col] = default
         out[col] = out[col].fillna(default)
     out["predictive_ranking_eligible"] = True
+    out = ensure_fva_metadata(out)
+    out = apply_confidence_caps(out, "fva_non_overlap_score")
     return out.sort_values(["priority_score", "confidence_score"], ascending=False)
 
 
@@ -364,10 +458,150 @@ def pathway_measured_candidates(measured_markers: pd.DataFrame) -> pd.DataFrame:
         reconciliation_status=("reconciliation_status", "first"),
         decision_role=("decision_role", "first"),
         interpretation_guardrail=("interpretation_guardrail", "first"),
+        fva_source=("fva_source", "first"),
+        fva_scope=("fva_scope", "first"),
+        discovery_role=("discovery_role", "first"),
     ).reset_index()
     out["candidate_type"] = "measured_pathway_screening_signature"
     out["candidate_label"] = "candidate measured pathway signature"
     out["analysis_context"] = "measured_phenotype"
+    return out
+
+
+def reaction_text(record: dict) -> str:
+    return " ".join(
+        str(record.get(key, ""))
+        for key in ["id", "name", "subsystem", "reaction"]
+    )
+
+
+def domain_reaction_ids(records: list, pattern: re.Pattern) -> set:
+    return {
+        str(record.get("id", ""))
+        for record in records
+        if pattern.search(reaction_text(record))
+    }
+
+
+def ids_from_csv(path: str) -> set:
+    df = read(path)
+    if df.empty:
+        return set()
+    id_col = next((col for col in ["reaction_id", "rxn_id", "reaction"] if col in df.columns), None)
+    return set(df[id_col].dropna().astype(str)) if id_col else set()
+
+
+def combined_full_fva_ids(tables: str) -> set:
+    paths = []
+    for scope in ["all", "internal"]:
+        paths.extend(glob.glob(os.path.join(tables, "full_fva", f"full_fva_{scope}_combined_report.csv")))
+    ids = set()
+    for path in paths:
+        ids.update(ids_from_csv(path))
+    return ids
+
+
+def make_domain_coverage_audit(
+    tables: str,
+    mapping_path: str,
+    reaction_sep: pd.DataFrame,
+    reaction_candidates: pd.DataFrame,
+) -> pd.DataFrame:
+    if not MODEL_PATH or not os.path.exists(MODEL_PATH):
+        model_records = []
+    else:
+        with open(MODEL_PATH, "r", encoding="utf-8") as handle:
+            model_records = json.load(handle).get("reactions", [])
+    focused_ids = ids_from_csv(os.path.join(tables, "central_mab_fva_report.csv"))
+    full_ids = combined_full_fva_ids(tables)
+    mapping_ids = ids_from_csv(mapping_path)
+    scored_ids = set(reaction_sep.get("reaction_id", pd.Series(dtype=str)).dropna().astype(str))
+    ranked_ids = set(reaction_candidates.get("reaction_id", pd.Series(dtype=str)).dropna().astype(str))
+
+    rows = []
+    for domain, pattern in DOMAIN_PATTERNS.items():
+        model_ids = domain_reaction_ids(model_records, pattern)
+        mapped_domain = model_ids & mapping_ids
+        focused_domain = model_ids & focused_ids
+        full_domain = model_ids & full_ids
+        scored_domain = model_ids & scored_ids
+        ranked_domain = model_ids & ranked_ids
+        mapping_percent = (
+            100.0 * len(mapped_domain) / len(model_ids)
+            if model_ids
+            else np.nan
+        )
+        if not model_ids:
+            status = "unavailable"
+            reason = "No matching iCHO3K reactions were identified; activity was not assessed."
+        elif mapped_domain and mapping_percent >= 50.0 and ranked_domain:
+            status = "adequately_covered"
+            reason = "Substantial mapping coverage and ranked evidence are available."
+        elif mapped_domain:
+            status = "partially_covered"
+            reason = "Only a subset of model reactions is mapped/scored; absence from ranking is not zero activity."
+        elif full_domain:
+            status = "full_fva_only"
+            reason = "Biology is present in full FVA but lacks CHOmpact mapping; interpretation is unavailable."
+        elif not focused_domain and not full_domain:
+            status = "not_evaluated"
+            reason = "Biology exists in iCHO3K but was not present in available FVA inputs."
+        else:
+            status = "mapping_missing"
+            reason = "Biology exists in iCHO3K/FVA but CHOmpact mapping is missing."
+        rows.append({
+            "domain": domain,
+            "model_reaction_count": len(model_ids),
+            "focused_fva_reaction_count": len(focused_domain),
+            "full_fva_reaction_count": len(full_domain),
+            "mapped_reaction_count": len(mapped_domain),
+            "scored_reaction_count": len(scored_domain),
+            "ranked_reaction_count": len(ranked_domain),
+            "mapping_coverage_percent": mapping_percent,
+            "analysis_status": status,
+            "limitation_reason": reason,
+        })
+    return pd.DataFrame(rows)
+
+
+def candidate_audit_domain(row: pd.Series) -> str:
+    text = " ".join(
+        str(row.get(col, ""))
+        for col in ["chompact_pathway", "chompact_subpathway", "reaction_id"]
+    ).lower()
+    if "pentose" in text or "ppp" in text:
+        return "PPP"
+    if "nucleotide" in text or "purine" in text or "pyrimidine" in text:
+        return "nucleotide metabolism"
+    if any(token in text for token in ["lipid", "fatty acid", "sphingo", "phospholipid"]):
+        return "lipid metabolism"
+    if any(token in text for token in ["nucleotide-sugar", "udp-glc", "gdp-fuc", "cmp-sial"]):
+        return "nucleotide-sugar donor metabolism"
+    if any(token in text for token in ["glycosyl", "glycan", "fucosyl", "sialyl"]):
+        return "glycosylation"
+    return ""
+
+
+def apply_audited_mapping_coverage(
+    df: pd.DataFrame,
+    coverage_audit: pd.DataFrame,
+) -> pd.DataFrame:
+    if df.empty or coverage_audit.empty:
+        return df
+    out = df.copy()
+    coverage_map = coverage_audit.set_index("domain")["mapping_coverage_percent"].to_dict()
+    out["coverage_audit_domain"] = out.apply(candidate_audit_domain, axis=1)
+    audited = out["coverage_audit_domain"].map(coverage_map)
+    current = pd.to_numeric(
+        out.get("mapping_coverage_score", pd.Series(np.nan, index=out.index)),
+        errors="coerce",
+    )
+    out["mapping_coverage_score"] = np.where(
+        audited.notna(),
+        np.fmin(current, audited),
+        current,
+    )
+    out = apply_confidence_caps(out, "robustness_score")
     return out
 
 
@@ -436,6 +670,18 @@ def main() -> None:
             ~pathway_candidates["high_low_difference_source"].eq("product_demand_driven")
         ].sort_values(["priority_score", "confidence_score"], ascending=False)
 
+    coverage_audit = make_domain_coverage_audit(
+        results_dir(args.dataset, "tables"),
+        os.path.join(ROOT, "data", "chompact_pathway_mapping.csv"),
+        reaction_sep,
+        reaction_candidates,
+    )
+    measured_markers = apply_audited_mapping_coverage(measured_markers, coverage_audit)
+    model_pathways = apply_audited_mapping_coverage(model_pathways, coverage_audit)
+    demand_explanations = apply_audited_mapping_coverage(demand_explanations, coverage_audit)
+    reaction_candidates = apply_audited_mapping_coverage(reaction_candidates, coverage_audit)
+    pathway_candidates = apply_audited_mapping_coverage(pathway_candidates, coverage_audit)
+
     outputs = {
         "measured_screening_markers.csv": measured_markers,
         "model_emergent_pathway_hypotheses.csv": model_pathways,
@@ -443,8 +689,25 @@ def main() -> None:
         "reaction_level_candidates.csv": reaction_candidates,
         "pathway_level_candidates.csv": pathway_candidates,
     }
+    outputs = {name: ensure_fva_metadata(df) for name, df in outputs.items()}
+    measured_markers = outputs["measured_screening_markers.csv"]
+    model_pathways = outputs["model_emergent_pathway_hypotheses.csv"]
+    demand_explanations = outputs["demand_conditioned_explanations.csv"]
+    reaction_candidates = outputs["reaction_level_candidates.csv"]
+    pathway_candidates = outputs["pathway_level_candidates.csv"]
     for name, df in outputs.items():
         df.to_csv(os.path.join(chompact_dir, name), index=False)
+
+    coverage_audit = make_domain_coverage_audit(
+        results_dir(args.dataset, "tables"),
+        os.path.join(ROOT, "data", "chompact_pathway_mapping.csv"),
+        reaction_sep,
+        reaction_candidates,
+    )
+    coverage_audit.to_csv(
+        os.path.join(chompact_dir, "chompact_domain_coverage_audit.csv"),
+        index=False,
+    )
 
     # Backward-compatible filenames remain available, but use PR1 terminology
     # and the new hypothesis_ranking_score instead of composite biomarker score.

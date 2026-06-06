@@ -38,6 +38,7 @@ PROVENANCE_COLUMNS = [
     "decision_role",
     "interpretation_guardrail",
 ]
+FVA_METADATA_COLUMNS = ["fva_source", "fva_scope", "discovery_role"]
 
 
 def read(path: str) -> pd.DataFrame:
@@ -114,6 +115,23 @@ def provenance_summary(df: pd.DataFrame, keys: list) -> pd.DataFrame:
     return summary
 
 
+def metadata_summary(df: pd.DataFrame, keys: list) -> pd.DataFrame:
+    if df.empty:
+        return pd.DataFrame(columns=keys + FVA_METADATA_COLUMNS)
+    aggregations = {
+        col: (col, lambda s: unique_or_mixed(s, "unavailable"))
+        for col in FVA_METADATA_COLUMNS
+        if col in df.columns
+    }
+    if not aggregations:
+        return pd.DataFrame(columns=keys + FVA_METADATA_COLUMNS)
+    summary = df.groupby(keys, dropna=False).agg(**aggregations).reset_index()
+    for col in FVA_METADATA_COLUMNS:
+        if col not in summary.columns:
+            summary[col] = "unavailable"
+    return summary
+
+
 def mapping_coverage(df: pd.DataFrame, keys: list) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame(columns=keys + ["n_reactions", "n_mapped_reactions", "mapping_coverage_score"])
@@ -142,7 +160,11 @@ def enrich_pathway_table(table: pd.DataFrame, source: pd.DataFrame, keys: list) 
     out = table.merge(provenance_summary(source, keys), on=keys, how="left")
     coverage = mapping_coverage(source, keys).drop(columns=["n_reactions"], errors="ignore")
     out = out.merge(coverage, on=keys, how="left")
-    out["evidence_coverage_score"] = 100.0
+    out = out.merge(metadata_summary(source, keys), on=keys, how="left")
+    # Each source-specific table contributes one evidence track. The integrated
+    # ranking expects at least two independent tracks, so a single available
+    # source is 50% coverage rather than an automatic 100%.
+    out["evidence_coverage_score"] = np.where(len(source) > 0, 50.0, np.nan)
     return out
 
 
@@ -248,6 +270,8 @@ def reaction_fba_separation(flux: pd.DataFrame) -> pd.DataFrame:
         }
         for col in PROVENANCE_COLUMNS:
             row[col] = unique_or_mixed(grp[col]) if col in grp.columns else "unknown"
+        for col in FVA_METADATA_COLUMNS:
+            row[col] = unique_or_mixed(grp[col], "unavailable") if col in grp.columns else "unavailable"
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -296,6 +320,8 @@ def reaction_fva_separation(fva: pd.DataFrame) -> pd.DataFrame:
         }
         for col in PROVENANCE_COLUMNS:
             row[col] = unique_or_mixed(grp[col]) if col in grp.columns else "unknown"
+        for col in FVA_METADATA_COLUMNS:
+            row[col] = unique_or_mixed(grp[col], "unavailable") if col in grp.columns else "unavailable"
         rows.append(row)
     return pd.DataFrame(rows)
 
@@ -332,12 +358,13 @@ def pathway_separation(reaction_sep: pd.DataFrame) -> pd.DataFrame:
     ).reset_index()
     provenance = provenance_summary(reaction_sep, keys)
     agg = agg.merge(provenance, on=keys, how="left")
+    agg = agg.merge(metadata_summary(reaction_sep, keys), on=keys, how="left")
     agg["source_type"] = np.where(
         agg["metric_family"].eq("FVA"),
         "model_predicted_fva_pathway_separation",
         "model_predicted_fba_pathway_separation",
     )
-    agg["evidence_coverage_score"] = 100.0
+    agg["evidence_coverage_score"] = 50.0
     agg["mapping_coverage_score"] = np.where(
         agg["n_reactions_tested"] > 0,
         100.0 * agg["n_mapped_reactions"] / agg["n_reactions_tested"],
@@ -413,12 +440,14 @@ def measured_high_low_effects(rates: pd.DataFrame) -> pd.DataFrame:
             "n_high": int((grp["producer_group"] == "High").sum()),
             "n_low": int((grp["producer_group"] == "Low").sum()),
             "source_type": "measured_qmet_high_low_effect",
-            "evidence_coverage_score": 100.0,
+            "evidence_coverage_score": 50.0,
             "mapping_coverage_score": 100.0 if grp.get("mapping_status", pd.Series(["mapped"])).eq("mapped").all() else 0.0,
             "robustness_score": np.nan,
         }
         for col in PROVENANCE_COLUMNS:
             row[col] = unique_or_mixed(grp[col]) if col in grp.columns else "unknown"
+        for col in FVA_METADATA_COLUMNS:
+            row[col] = unique_or_mixed(grp[col], "unavailable") if col in grp.columns else "unavailable"
         rows.append(row)
     return pd.DataFrame(rows)
 
