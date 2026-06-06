@@ -4,24 +4,13 @@ Python imports ``sitecustomize`` automatically when it is present on ``sys.path`
 The pipeline launches each step with the repository root as the working directory,
 so this file is loaded before the plotting scripts import matplotlib.
 
-Purpose for v1.0
-----------------
-The calculation scripts were validated during development while still carrying
-legacy figure labels such as Figure 10, 15, and 21. For the v1.0 release we keep
-those validated computational scripts stable and standardize only the user-facing
-figure labels at render time.
+Purpose
+-------
+Reserve a repository-wide title normalization hook. Current step scripts use the
+final release titles directly, so no runtime replacements are required.
 """
 
-FIGURE_TITLE_REPLACEMENTS = {
-    "Figure 5. Exchange Rate Comparison": "Figure 4. Exchange Rate Comparison",
-    "Figure 10. Clone/group central-metabolism and mAb-pathway flux heatmap": "Figure 5. Clone/group central-metabolism and mAb-pathway flux heatmap",
-    "Figure 10B. Row-wise relative flux pattern across clones/groups": "Figure 6. Row-wise relative flux pattern across clones/groups",
-    "Figure 11. High-vs-Low group flux differences across central metabolism and mAb pathways": "Figure 7. High-vs-Low group flux differences across central metabolism and mAb pathways",
-    "Figure 21. Genome-scale/internal FVA High-vs-Low separation": "Figure 9. Full/internal/all FVA High-vs-Low separation",
-    "Figure 21B. Genome-scale/internal FVA flexibility delta": "Figure 10. Full/internal/all FVA flexibility delta",
-    "CHO Fed-Batch Clone Flux-Comparison Summary": "Figure 11. CHO Fed-Batch Clone Flux-Comparison Summary",
-    "Figure 13.": "Supplementary Figure 1.",
-}
+FIGURE_TITLE_REPLACEMENTS = {}
 
 
 def _standardize_title(text):

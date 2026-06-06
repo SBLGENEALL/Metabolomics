@@ -26,8 +26,8 @@ results/<dataset>/tables/full_fva/
   full_fva_<scope>_high_low_overlap.csv
   full_fva_<scope>_central_mab_subset.csv
 results/<dataset>/figures/
-  Fig21_full_fva_high_low_separation.png
-  Fig21B_full_fva_range_delta.png
+  Fig9_full_fva_high_low_separation.png
+  Fig10_full_fva_range_delta.png
 """
 import argparse
 import os
@@ -363,10 +363,10 @@ if not combined.empty and {"HighAvg", "LowAvg"}.issubset(set(combined["condition
             fig, ax = plt.subplots(figsize=(11, max(6, 0.28 * len(top) + 1.5)))
             ax.barh(labels, top["separation_width"])
             ax.set_xlabel("High/Low FVA non-overlap width")
-            ax.set_title(f"Figure 21. Genome-scale/internal FVA High-vs-Low separation ({args.fva_scope}, {comp_mode})", weight="bold")
+            ax.set_title("Figure 9. Full FVA High-vs-Low Separation", weight="bold")
             ax.grid(True, axis="x", ls=":", alpha=0.5)
             fig.tight_layout()
-            fig.savefig(os.path.join(fig_dir, "Fig21_full_fva_high_low_separation.png"), dpi=250, bbox_inches="tight")
+            fig.savefig(os.path.join(fig_dir, "Fig9_full_fva_high_low_separation.png"), dpi=250, bbox_inches="tight")
             plt.close(fig)
         top2 = ov.sort_values("abs_range_delta", ascending=False).head(30).iloc[::-1]
         if not top2.empty:
@@ -375,14 +375,14 @@ if not combined.empty and {"HighAvg", "LowAvg"}.issubset(set(combined["condition
             ax.barh(labels, top2["range_delta_high_minus_low"])
             ax.axvline(0, color="black", lw=1)
             ax.set_xlabel("HighAvg FVA range - LowAvg FVA range")
-            ax.set_title(f"Figure 21B. Genome-scale/internal FVA flexibility delta ({args.fva_scope}, {comp_mode})", weight="bold")
+            ax.set_title("Figure 10. Full FVA Flexibility Delta", weight="bold")
             ax.grid(True, axis="x", ls=":", alpha=0.5)
             fig.tight_layout()
-            fig.savefig(os.path.join(fig_dir, "Fig21B_full_fva_range_delta.png"), dpi=250, bbox_inches="tight")
+            fig.savefig(os.path.join(fig_dir, "Fig10_full_fva_range_delta.png"), dpi=250, bbox_inches="tight")
             plt.close(fig)
-            print("  [saved] results/%s/figures/Fig21*.png" % DATASET)
+            print("  [saved] results/%s/figures/Fig9_*.png and Fig10_*.png" % DATASET)
     except Exception as e:
-        print(f"  !! Fig21 skipped: {e}")
+        print(f"  !! Full FVA figures skipped: {e}")
 
 readme = f"""# Full/Internal FVA report
 

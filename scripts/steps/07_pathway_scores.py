@@ -108,7 +108,7 @@ if not fva.empty:
         path_sep.to_csv(os.path.join(tables,"fva_pathway_flexibility_summary.csv"),index=False)
         print(f"  [saved] results/{DATASET}/tables/fva_high_low_overlap_separation.csv")
 
-        # Figure 15: pathway score + overlap summary
+        # Figure 8: pathway score + overlap summary
         fig,axes=plt.subplots(1,2,figsize=(14,5))
         ps=pd.read_csv(os.path.join(tables,"pathway_score_high_low_delta.csv")) if os.path.exists(os.path.join(tables,"pathway_score_high_low_delta.csv")) else pd.DataFrame()
         if not ps.empty:
@@ -122,10 +122,11 @@ if not fva.empty:
             axes[1].barh(p2["pathway"],p2["mean_abs_range_delta"])
             axes[1].set_title("FVA flexibility difference by pathway")
             axes[1].set_xlabel("Mean |range delta|")
+        fig.suptitle("Figure 8. Pathway pFBA/FVA Summary", fontweight="bold")
         fig.tight_layout()
-        fig.savefig(os.path.join(figs,"Fig15_pathway_scores_fva_overlap.png"),dpi=200)
+        fig.savefig(os.path.join(figs,"Fig8_pathway_scores_fva_overlap.png"),dpi=200)
         plt.close(fig)
-        print(f"  [saved] results/{DATASET}/figures/Fig15_pathway_scores_fva_overlap.png")
+        print(f"  [saved] results/{DATASET}/figures/Fig8_pathway_scores_fva_overlap.png")
 
 # Sensitivity: perturb HighAvg and LowAvg constraints and see whether panel deltas keep their sign.
 try:

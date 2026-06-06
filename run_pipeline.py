@@ -49,7 +49,10 @@ STEP_MAP = {
 }
 
 FIGURE_RENAME_MAP = {
-    "Fig5_high_vs_low_rates.png": "Fig4_high_vs_low_rates.png",
+    "Fig2_rate_heatmap.png": "Fig2_exchange_rate_heatmap.png",
+    "Fig3_lac_glc_ratio.png": "Fig3_lactate_glucose_phenotype.png",
+    "Fig4_high_vs_low_rates.png": "Fig4_high_low_exchange_rates.png",
+    "Fig5_high_vs_low_rates.png": "Fig4_high_low_exchange_rates.png",
     "Fig10_central_mab_flux_heatmap.png": "Fig5_central_mab_flux_heatmap.png",
     "Fig10B_central_mab_flux_zscore.png": "Fig6_central_mab_flux_zscore.png",
     "Fig11_central_mab_flux_delta.png": "Fig7_central_mab_flux_delta.png",
@@ -58,9 +61,12 @@ FIGURE_RENAME_MAP = {
     "Fig21B_full_fva_range_delta.png": "Fig10_full_fva_range_delta.png",
     "Fig8_summary_panel.png": "Fig11_summary_panel.png",
     "Fig13_data_qc_overview.png": "SuppFig1_data_qc_overview.png",
+    "Fig12_chompact_pathway_activity.png": "Fig12_measured_screening_markers.png",
+    "Fig13_chompact_fva_robustness.png": "Fig13_model_emergent_fva_robustness.png",
+    "Fig14_chompact_biomarker_ranking.png": "Fig14_candidate_pathway_priority_confidence.png",
 }
 
-# Legacy or retired files that should not remain in v1.0 output folders.
+# Legacy or retired files that should not remain in release output folders.
 RETIRED_FIGURES = {
     "Fig4_fba_results.png",
     "Fig7_ko_screen.png",
@@ -77,11 +83,17 @@ RETIRED_FIGURES = {
     "Fig21B_full_fva_range_delta.png",
     "Fig8_summary_panel.png",
     "Fig5_high_vs_low_rates.png",
+    "Fig2_rate_heatmap.png",
+    "Fig3_lac_glc_ratio.png",
+    "Fig4_high_vs_low_rates.png",
+    "Fig12_chompact_pathway_activity.png",
+    "Fig13_chompact_fva_robustness.png",
+    "Fig14_chompact_biomarker_ranking.png",
 }
 
 
 def _standardize_figures(dataset):
-    """Rename legacy figure outputs to the clean v1.0 figure numbering.
+    """Rename legacy figure outputs to the release figure naming scheme.
 
     The computational step scripts intentionally remain close to the validated
     development versions. This post-processing layer makes the user-facing output
@@ -111,7 +123,7 @@ def _standardize_figures(dataset):
                 pass
 
     if renamed:
-        print("  [figures] v1.0 filenames standardized:")
+        print("  [figures] release filenames standardized:")
         for old, new in renamed:
             print(f"    {old} -> {new}")
 

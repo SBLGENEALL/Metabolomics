@@ -11,7 +11,7 @@ results/<dataset>/tables/data_qc_warnings.csv
 results/<dataset>/tables/data_qc_timeseries_summary.csv
 results/<dataset>/tables/data_qc_rate_flags.csv          # if step 1 has run
 results/<dataset>/tables/data_qc_carbon_nitrogen_proxy.csv # if step 1 has run
-results/<dataset>/figures/Fig13_data_qc_overview.png
+results/<dataset>/figures/SuppFig1_data_qc_overview.png
 """
 import argparse
 import os
@@ -237,8 +237,9 @@ try:
     ax.bar(labels, counts["n"])
     ax.set_title("Column availability")
     ax.tick_params(axis="x", rotation=30)
+    fig.suptitle("Supplementary Figure 1. Data QC Overview", fontweight="bold")
     fig.tight_layout()
-    fig.savefig(os.path.join(out_fig, "Fig13_data_qc_overview.png"), dpi=200)
+    fig.savefig(os.path.join(out_fig, "SuppFig1_data_qc_overview.png"), dpi=200)
     plt.close(fig)
 except Exception as e:
     warn("WARN", "qc_figure", f"Could not generate QC figure: {e}")

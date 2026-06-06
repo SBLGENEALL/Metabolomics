@@ -91,13 +91,10 @@ def save_measured_markers(measured: pd.DataFrame, fig_dir: str) -> str:
     ax.barh(use["label"], use["signed_high_low_difference"], color=colors)
     ax.axvline(0, color="#222222", lw=1)
     ax.set_xlabel("Measured qMet difference: High - Low")
-    ax.set_title(
-        "Figure 12. Measured screening/feed-media markers\n"
-        "observed exchange phenotype; not a model-emergent mechanism"
-    )
+    ax.set_title("Figure 12. Measured Screening and Feed-Media Markers")
     ax.grid(True, axis="x", ls=":", alpha=0.45)
     fig.tight_layout()
-    path = os.path.join(fig_dir, "Fig12_chompact_pathway_activity.png")
+    path = os.path.join(fig_dir, "Fig12_measured_screening_markers.png")
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
     return path
@@ -117,14 +114,11 @@ def save_model_robustness(model_pathways: pd.DataFrame, fig_dir: str) -> str:
     fig, ax = plt.subplots(figsize=(8.8, max(4.5, 0.36 * len(use) + 1.4)))
     ax.barh(use["label"], use["robustness_score"], color="#CC79A7")
     ax.set_xlabel("FVA robustness score (0-100)")
-    ax.set_title(
-        "Figure 13. Model-emergent pathway robustness\n"
-        "product-demand-driven IgG reactions excluded from predictive ranking"
-    )
+    ax.set_title("Figure 13. Model-Emergent Pathway Robustness")
     ax.set_xlim(0, 105)
     ax.grid(True, axis="x", ls=":", alpha=0.45)
     fig.tight_layout()
-    path = os.path.join(fig_dir, "Fig13_chompact_fva_robustness.png")
+    path = os.path.join(fig_dir, "Fig13_model_emergent_fva_robustness.png")
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
     return path
@@ -176,14 +170,11 @@ def save_priority_confidence(candidates: pd.DataFrame, fig_dir: str) -> str:
     ax.set_ylim(0, 105)
     ax.set_xlabel("Priority score")
     ax.set_ylabel("Confidence score")
-    ax.set_title(
-        "Figure 14. Candidate pathway signatures\n"
-        "priority and confidence shown separately; not validated biomarkers"
-    )
+    ax.set_title("Figure 14. Candidate Pathway Priority and Confidence")
     ax.grid(True, ls=":", alpha=0.35)
     ax.legend(loc="lower right", fontsize=8)
     fig.tight_layout()
-    path = os.path.join(fig_dir, "Fig14_chompact_biomarker_ranking.png")
+    path = os.path.join(fig_dir, "Fig14_candidate_pathway_priority_confidence.png")
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
     return path
@@ -285,6 +276,35 @@ independent predictive ranking.
         handle.write(text)
 
 
+def update_main_report(dataset: str, fig_paths: list) -> None:
+    report_path = os.path.join(results_dir(dataset, "."), "REPORT_SUMMARY.md")
+    if not os.path.exists(report_path):
+        return
+    start_marker = "<!-- PR1_FIGURES_START -->"
+    end_marker = "<!-- PR1_FIGURES_END -->"
+    with open(report_path, "r", encoding="utf-8") as handle:
+        text = handle.read()
+    if start_marker in text and end_marker in text:
+        before = text.split(start_marker, 1)[0].rstrip()
+        after = text.split(end_marker, 1)[1].lstrip()
+        text = before + ("\n\n" + after if after else "")
+    rel_figs = [
+        os.path.relpath(path, ROOT).replace("\\", "/")
+        for path in fig_paths
+        if path
+    ]
+    section = [
+        start_marker,
+        "## PR1 evidence-aware decision figures",
+        "",
+        *(f"- `{path}`" for path in rel_figs),
+        end_marker,
+    ]
+    text = text.rstrip() + "\n\n" + "\n".join(section) + "\n"
+    with open(report_path, "w", encoding="utf-8") as handle:
+        handle.write(text)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Create evidence-aware CHOmpact decision-support figures")
     parser.add_argument("--dataset", default="practice_20aa", choices=["sowa2020", "practice_20aa", "own_experiment"])
@@ -308,6 +328,7 @@ def main() -> None:
         save_priority_confidence(candidates, fig_dir),
     ]
     write_summary(args.dataset, chompact_dir, paths, measured, model, demand)
+    update_main_report(args.dataset, paths)
     print("[saved] CHOmpact PR1 decision-support figures:")
     for path in paths:
         if path:

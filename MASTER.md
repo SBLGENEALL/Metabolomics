@@ -258,9 +258,9 @@ Main figures:
 
 ```text
 Fig1_IgG_timecourse.png
-Fig2_rate_heatmap.png
-Fig3_lac_glc_ratio.png
-Fig4_high_vs_low_rates.png
+Fig2_exchange_rate_heatmap.png
+Fig3_lactate_glucose_phenotype.png
+Fig4_high_low_exchange_rates.png
 Fig5_central_mab_flux_heatmap.png
 Fig6_central_mab_flux_zscore.png
 Fig7_central_mab_flux_delta.png
@@ -314,9 +314,9 @@ CHOmpact_v1_1_executive_summary.md
 v1.1 figures:
 
 ```text
-Fig12_chompact_pathway_activity.png
-Fig13_chompact_fva_robustness.png
-Fig14_chompact_biomarker_ranking.png
+Fig12_measured_screening_markers.png
+Fig13_model_emergent_fva_robustness.png
+Fig14_candidate_pathway_priority_confidence.png
 ```
 
 ---
@@ -351,9 +351,9 @@ All figure filenames, internal figure numbers, and `REPORT_SUMMARY.md` reference
 | Figure | File | What it shows | How to interpret |
 |---|---|---|---|
 | Fig1 | `Fig1_IgG_timecourse.png` | IgG titer or production time course across culture days/groups. | Confirms productivity pattern and group separation. This is measured process output, not model prediction. |
-| Fig2 | `Fig2_rate_heatmap.png` | Exchange-rate heatmap for measured metabolites. | Shows extracellular uptake/secretion patterns that become model exchange constraints. |
-| Fig3 | `Fig3_lac_glc_ratio.png` | Lactate/glucose relationship or ratio. | Interprets overflow metabolism and glucose-lactate phenotype. |
-| Fig4 | `Fig4_high_vs_low_rates.png` | High-vs-Low or group-level exchange-rate differences. | Highlights measured qMet features that may explain or constrain downstream model results. |
+| Fig2 | `Fig2_exchange_rate_heatmap.png` | Exchange-rate heatmap for measured metabolites. | Shows extracellular uptake/secretion patterns that become model exchange constraints. |
+| Fig3 | `Fig3_lactate_glucose_phenotype.png` | Lactate/glucose relationship or ratio. | Interprets overflow metabolism and glucose-lactate phenotype. |
+| Fig4 | `Fig4_high_low_exchange_rates.png` | High-vs-Low or group-level exchange-rate differences. | Highlights measured qMet features that may explain or constrain downstream model results. |
 | Fig5 | `Fig5_central_mab_flux_heatmap.png` | Central/mAb-related pFBA flux state. | Model-predicted intracellular flux state under measured constraints. |
 | Fig6 | `Fig6_central_mab_flux_zscore.png` | Z-scored central/mAb flux pattern. | Useful for pattern comparison; z-score magnitude is relative within the plotted matrix. |
 | Fig7 | `Fig7_central_mab_flux_delta.png` | Group delta in central/mAb fluxes. | Highlights predicted reaction-level shifts between groups. |
@@ -361,9 +361,9 @@ All figure filenames, internal figure numbers, and `REPORT_SUMMARY.md` reference
 | Fig9 | `Fig9_full_fva_high_low_separation.png` | Full/internal genome-scale FVA group separation. | Broad model scan for reactions with potential feasible-range separation. |
 | Fig10 | `Fig10_full_fva_range_delta.png` | Full FVA range-width or range-delta summary. | Identifies reactions/pathways with changed flexibility or constraint tightness. |
 | Fig11 | `Fig11_summary_panel.png` | Summary panel of v1.0 outputs. | High-level dashboard for report-level interpretation. |
-| Fig12 | `Fig12_chompact_pathway_activity.png` | CHOmpact-labeled pathway activity from mapped iCHO3K outputs. | Biological vocabulary layer; does not recompute CHOmpact flux. |
-| Fig13 | `Fig13_chompact_fva_robustness.png` | CHOmpact pathway robustness from mapped FVA outputs. | Prioritizes pathways with stable model support across feasible ranges. |
-| Fig14 | `Fig14_chompact_biomarker_ranking.png` | CHOmpact biomarker/candidate ranking. | Should display priority, confidence, evidence type, pathway class, and coverage. |
+| Fig12 | `Fig12_measured_screening_markers.png` | Measured screening and feed-media markers. | Separates observed qMet evidence from model-emergent hypotheses. |
+| Fig13 | `Fig13_model_emergent_fva_robustness.png` | Model-emergent pathway robustness from mapped FVA outputs. | Prioritizes pathways with stable model support across feasible ranges. |
+| Fig14 | `Fig14_candidate_pathway_priority_confidence.png` | Candidate pathway priority-confidence view. | Displays priority and confidence separately with evidence provenance. |
 | SuppFig1 | `SuppFig1_data_qc_overview.png` | Data QC overview. | Use before interpreting model output; bad input quality invalidates downstream conclusions. |
 
 ---

@@ -185,9 +185,9 @@ Inputs:
 
 Outputs:
 
-- `results/<dataset>/figures/Fig12_chompact_pathway_activity.png`
-- `results/<dataset>/figures/Fig13_chompact_fva_robustness.png`
-- `results/<dataset>/figures/Fig14_chompact_biomarker_ranking.png`
+- `results/<dataset>/figures/Fig12_measured_screening_markers.png`
+- `results/<dataset>/figures/Fig13_model_emergent_fva_robustness.png`
+- `results/<dataset>/figures/Fig14_candidate_pathway_priority_confidence.png`
 - `results/<dataset>/tables/chompact/CHOmpact_v1_1_executive_summary.md`
 
 Pseudocode:

@@ -25,8 +25,9 @@ Outputs
 results/<dataset>/tables/central_mab_reaction_panel.csv
 results/<dataset>/tables/central_mab_flux_state.csv
 results/<dataset>/tables/central_mab_fva_report.csv
-results/<dataset>/figures/Fig10_central_mab_flux_heatmap.png
-results/<dataset>/figures/Fig11_central_mab_fva_delta.png
+results/<dataset>/figures/Fig5_central_mab_flux_heatmap.png
+results/<dataset>/figures/Fig6_central_mab_flux_zscore.png
+results/<dataset>/figures/Fig7_central_mab_flux_delta.png
 """
 import argparse
 import os
@@ -390,7 +391,7 @@ if not flux_df.empty:
             delta_df = pd.DataFrame(rows).sort_values("abs_delta", ascending=False)
             save_table(delta_df, f"central_mab_flux_delta_high_low_{mode}.csv", DATASET)
 
-# Figure 10: central/mAb pFBA flux heatmap.
+# Figure 5: central/mAb pFBA flux heatmap.
 if not flux_df.empty:
     plot_mode = "measured_demand" if "measured_demand" in set(flux_df["mode"]) else sorted(flux_df["mode"].unique())[0]
     sub = flux_df[flux_df["mode"] == plot_mode].copy()
@@ -415,15 +416,15 @@ if not flux_df.empty:
     ax.set_yticklabels(piv.index, fontsize=8)
     ax.set_xticks(np.arange(len(piv.columns)))
     ax.set_xticklabels(piv.columns, rotation=35, ha="right")
-    ax.set_title(f"Figure 10. Clone/group central-metabolism and mAb-pathway flux heatmap ({plot_mode})", weight="bold")
+    ax.set_title("Figure 5. iCHO3K Central/mAb Flux Heatmap", weight="bold")
     ax.set_xlabel("Condition")
     ax.set_ylabel("Pathway | Reaction")
     cbar = fig.colorbar(im, ax=ax, fraction=0.025, pad=0.02)
     cbar.set_label("Flux")
     fig.tight_layout()
-    save_figure(fig, "Fig10_central_mab_flux_heatmap.png", DATASET)
+    save_figure(fig, "Fig5_central_mab_flux_heatmap.png", DATASET)
 
-    # Figure 10B: row-wise z-score heatmap. Absolute flux heatmaps are often
+    # Figure 6: row-wise z-score heatmap. Absolute flux heatmaps are often
     # dominated by a few large energy/TCA reactions; z-scoring each reaction
     # exposes clone/group-specific relative differences. This is a visualization
     # aid, not a different FBA calculation.
@@ -439,17 +440,17 @@ if not flux_df.empty:
         ax.set_yticklabels(zpiv.index, fontsize=8)
         ax.set_xticks(np.arange(len(zpiv.columns)))
         ax.set_xticklabels(zpiv.columns, rotation=35, ha="right")
-        ax.set_title(f"Figure 10B. Row-wise relative flux pattern across clones/groups ({plot_mode})", weight="bold")
+        ax.set_title("Figure 6. Row-wise Relative Central/mAb Flux Pattern", weight="bold")
         ax.set_xlabel("Condition")
         ax.set_ylabel("Pathway | Reaction")
         cbar = fig.colorbar(im, ax=ax, fraction=0.025, pad=0.02)
         cbar.set_label("Row-wise z-score of flux")
         fig.tight_layout()
-        save_figure(fig, "Fig10B_central_mab_flux_zscore.png", DATASET)
+        save_figure(fig, "Fig6_central_mab_flux_zscore.png", DATASET)
     except Exception as e:
-        print(f"  !! Fig10B skipped: {e}")
+        print(f"  !! Fig6 skipped: {e}")
 
-# Figure 11: High-vs-low delta for central/mAb fluxes.
+# Figure 7: High-vs-low delta for central/mAb fluxes.
 try:
     plot_mode = "measured_demand" if os.path.exists(os.path.join(results_dir(DATASET, "tables"), "central_mab_flux_delta_high_low_measured_demand.csv")) else "no_igg_input"
     delta_path = os.path.join(results_dir(DATASET, "tables"), f"central_mab_flux_delta_high_low_{plot_mode}.csv")
@@ -459,12 +460,12 @@ try:
         ax.barh(d["pathway"] + " | " + d["label"], d["delta_high_minus_low"])
         ax.axvline(0, color="black", lw=1)
         ax.set_xlabel("High - Low flux")
-        ax.set_title(f"Figure 11. High-vs-Low group flux differences across central metabolism and mAb pathways ({plot_mode})", weight="bold")
+        ax.set_title("Figure 7. High-vs-Low Central/mAb Flux Difference", weight="bold")
         ax.grid(True, axis="x", ls=":", alpha=0.5)
         fig.tight_layout()
-        save_figure(fig, "Fig11_central_mab_flux_delta.png", DATASET)
+        save_figure(fig, "Fig7_central_mab_flux_delta.png", DATASET)
 except Exception as e:
-    print(f"  !! Fig11 skipped: {e}")
+    print(f"  !! Fig7 skipped: {e}")
 
 # Markdown interpretation guide.
 guide = f"""# Central metabolism + mAb FVA report

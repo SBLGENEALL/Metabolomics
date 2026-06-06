@@ -84,9 +84,9 @@ if not sens.empty and "robust_direction" in sens.columns:
 
 figure_order = [
     "Fig1_IgG_timecourse.png",
-    "Fig2_rate_heatmap.png",
-    "Fig3_lac_glc_ratio.png",
-    "Fig4_high_vs_low_rates.png",
+    "Fig2_exchange_rate_heatmap.png",
+    "Fig3_lactate_glucose_phenotype.png",
+    "Fig4_high_low_exchange_rates.png",
     "Fig5_central_mab_flux_heatmap.png",
     "Fig6_central_mab_flux_zscore.png",
     "Fig7_central_mab_flux_delta.png",
@@ -94,15 +94,10 @@ figure_order = [
     "Fig9_full_fva_high_low_separation.png",
     "Fig10_full_fva_range_delta.png",
     "Fig11_summary_panel.png",
-    # Legacy names are kept as fallback if output renaming has not run yet.
-    "Fig5_high_vs_low_rates.png",
-    "Fig10_central_mab_flux_heatmap.png",
-    "Fig10B_central_mab_flux_zscore.png",
-    "Fig11_central_mab_flux_delta.png",
-    "Fig15_pathway_scores_fva_overlap.png",
-    "Fig21_full_fva_high_low_separation.png",
-    "Fig21B_full_fva_range_delta.png",
-    "Fig8_summary_panel.png",
+    "Fig12_measured_screening_markers.png",
+    "Fig13_model_emergent_fva_robustness.png",
+    "Fig14_candidate_pathway_priority_confidence.png",
+    "SuppFig1_data_qc_overview.png",
 ]
 
 lines = []
