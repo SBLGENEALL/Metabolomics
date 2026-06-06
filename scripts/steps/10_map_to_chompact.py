@@ -48,11 +48,37 @@ OPTIONAL_MAPPING_COLUMNS = [
 
 REACTION_ID_ALIASES = ["rxn_id", "reaction", "Reaction ID", "reactionID", "id"]
 MAPPING_VALUE_COLUMNS = REQUIRED_MAPPING_COLUMNS[1:] + OPTIONAL_MAPPING_COLUMNS
+PROVENANCE_COLUMNS = [
+    "evidence_observability",
+    "high_low_difference_source",
+    "reconciliation_status",
+    "decision_role",
+    "interpretation_guardrail",
+]
+
+PRODUCT_DEMAND_REACTIONS = {
+    "DM_igg_g",
+    "DM_for_igg",
+    "igg_formation",
+    "igg_hc",
+    "igg_lc",
+}
+
+FEED_MEDIA_EXCHANGES = {
+    "EX_glc_e",
+    "EX_lac_L_e",
+    "EX_gln_L_e",
+    "EX_glu_L_e",
+    "EX_nh4_e",
+}
 
 
 def read_csv_if_exists(path: Optional[str]) -> pd.DataFrame:
     if path and os.path.exists(path):
-        return pd.read_csv(path)
+        try:
+            return pd.read_csv(path)
+        except pd.errors.EmptyDataError:
+            return pd.DataFrame()
     return pd.DataFrame()
 
 
@@ -117,6 +143,56 @@ def infer_reaction_class(reaction_id: str) -> str:
     return "internal"
 
 
+def evidence_provenance(reaction_id: str, source_type: str, reaction_class: str) -> dict:
+    """Return conservative industrial interpretation labels for one reaction.
+
+    Observability describes the biological quantity represented by the row,
+    while source_type still records which pipeline table produced the value.
+    Measured exchange reactions remain screening/feed markers even when the row
+    contains a model flux constrained by the measured exchange phenotype.
+    """
+    rid = str(reaction_id)
+    rclass = str(reaction_class or infer_reaction_class(rid))
+    is_product = rid in PRODUCT_DEMAND_REACTIONS or "igg" in rid.lower()
+    is_exchange = rclass == "exchange" or rid.startswith("EX_")
+
+    if is_product:
+        return {
+            "evidence_observability": "predicted_only",
+            "high_low_difference_source": "product_demand_driven",
+            "reconciliation_status": "not_applicable",
+            "decision_role": "do_not_rank_as_predictive",
+            "interpretation_guardrail": (
+                "Product-demand-driven reconstruction; explanatory only and "
+                "excluded from independent predictive ranking."
+            ),
+        }
+
+    if is_exchange:
+        role = "feed_media_marker" if rid in FEED_MEDIA_EXCHANGES else "clone_selection_marker"
+        return {
+            "evidence_observability": "measured",
+            "high_low_difference_source": "exchange_constraint_driven",
+            "reconciliation_status": "not_applicable",
+            "decision_role": role,
+            "interpretation_guardrail": (
+                "Measured or measurement-derived exchange phenotype; use for "
+                "screening and feed/media triage, not as a model-emergent mechanism."
+            ),
+        }
+
+    return {
+        "evidence_observability": "predicted_only",
+        "high_low_difference_source": "model_emergent",
+        "reconciliation_status": "untested",
+        "decision_role": "engineering_hypothesis",
+        "interpretation_guardrail": (
+            "Internal iCHO3K prediction under measured constraints; treat as an "
+            "engineering target hypothesis requiring independent validation."
+        ),
+    }
+
+
 def load_mapping(path: str) -> pd.DataFrame:
     mapping = collapse_duplicate_columns(pd.read_csv(path))
     mapping = normalize_reaction_id(mapping)
@@ -163,6 +239,17 @@ def attach_mapping(df: pd.DataFrame, mapping: pd.DataFrame, source_type: str) ->
     if "priority_for_figures" not in out.columns:
         out["priority_for_figures"] = 3
     out["priority_for_figures"] = pd.to_numeric(out["priority_for_figures"], errors="coerce").fillna(3).astype(int)
+    provenance = out.apply(
+        lambda row: evidence_provenance(
+            row["reaction_id"],
+            source_type,
+            row.get("reaction_class", ""),
+        ),
+        axis=1,
+        result_type="expand",
+    )
+    for col in PROVENANCE_COLUMNS:
+        out[col] = provenance[col]
     return out
 
 

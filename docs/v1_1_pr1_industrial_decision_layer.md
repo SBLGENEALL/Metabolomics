@@ -22,6 +22,52 @@ This PR must remain a v1.1 polish/fix release. It should not add new v1.2-scale 
 
 ---
 
+## PR1 implementation status
+
+Implemented in steps 10-14:
+
+```text
+1. Reaction-level evidence provenance labels
+2. Measured High-Low qMet effect scoring
+3. Reaction-level FBA/FVA separation before pathway aggregation
+4. Separate measured, model-emergent, and demand-conditioned ranking tracks
+5. Separate priority and confidence scores
+6. NA-preserving missing-evidence handling
+7. Predictive-ranking exclusion for product-demand-driven IgG reactions
+8. Evidence-aware Figures 12-14
+9. Three-layer industrial executive summary
+```
+
+New decision-support tables:
+
+```text
+results/<dataset>/tables/chompact/measured_screening_markers.csv
+results/<dataset>/tables/chompact/model_emergent_pathway_hypotheses.csv
+results/<dataset>/tables/chompact/demand_conditioned_explanations.csv
+results/<dataset>/tables/chompact/reaction_level_candidates.csv
+results/<dataset>/tables/chompact/pathway_level_candidates.csv
+```
+
+Supporting evidence tables:
+
+```text
+chompact_measured_high_low_effects.csv
+chompact_reaction_high_low_separation.csv
+chompact_industrial_ranking_qc.csv
+```
+
+Validation command:
+
+```text
+python run_pipeline.py --dataset practice_20aa --steps 10,11,12,13,14
+```
+
+PR1 retains the existing v1.1 filenames for compatibility, but their content
+uses candidate-signature and hypothesis-ranking terminology. Steps 00-09 are
+unchanged.
+
+---
+
 ## 1. Consensus from Claude and Codex review
 
 Both biological and analytics reviews agree on the same core issue:

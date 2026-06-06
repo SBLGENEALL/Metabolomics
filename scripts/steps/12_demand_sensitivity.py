@@ -30,6 +30,15 @@ sys.path.insert(0, ROOT)
 from src.config import results_dir  # noqa: E402
 
 
+PROVENANCE_COLUMNS = [
+    "evidence_observability",
+    "high_low_difference_source",
+    "reconciliation_status",
+    "decision_role",
+    "interpretation_guardrail",
+]
+
+
 def read(path: str) -> pd.DataFrame:
     if not os.path.exists(path):
         return pd.DataFrame()
@@ -90,16 +99,37 @@ def robust_rank(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return pd.DataFrame()
     keys = ["chompact_pathway", "chompact_subpathway", "comparison", "metric_family"]
-    out = df.groupby(keys, dropna=False).agg(
-        n_demand_settings=("sensitivity_run", "nunique"),
-        median_rank=("rank_within_run", "median"),
-        best_rank=("rank_within_run", "min"),
-        worst_rank=("rank_within_run", "max"),
-        rank_iqr=("rank_within_run", lambda s: float(np.nanpercentile(s, 75) - np.nanpercentile(s, 25))),
-        median_rank_value=("rank_value", "median"),
-        sign_consistency=("delta_a_minus_b", lambda s: float((np.sign(s.dropna()) == np.sign(s.dropna()).mode().iloc[0]).mean()) if len(s.dropna()) else np.nan),
-    ).reset_index()
-    out["top10_frequency"] = df.assign(is_top10=df["rank_within_run"] <= 10).groupby(keys, dropna=False)["is_top10"].mean().values
+    aggregations = {
+        "n_demand_settings": ("sensitivity_run", "nunique"),
+        "median_rank": ("rank_within_run", "median"),
+        "best_rank": ("rank_within_run", "min"),
+        "worst_rank": ("rank_within_run", "max"),
+        "rank_iqr": ("rank_within_run", lambda s: float(np.nanpercentile(s, 75) - np.nanpercentile(s, 25))),
+        "median_rank_value": ("rank_value", "median"),
+        "sign_consistency": (
+            "delta_a_minus_b",
+            lambda s: float((np.sign(s.dropna()) == np.sign(s.dropna()).mode().iloc[0]).mean())
+            if len(s.dropna())
+            else np.nan,
+        ),
+    }
+    for col in PROVENANCE_COLUMNS:
+        if col in df.columns:
+            aggregations[col] = (
+                col,
+                lambda s: s.dropna().iloc[0]
+                if s.dropna().nunique() == 1
+                else ("mixed" if len(s.dropna()) else "unknown"),
+            )
+    out = df.groupby(keys, dropna=False).agg(**aggregations).reset_index()
+    top10 = (
+        df.assign(is_top10=df["rank_within_run"] <= 10)
+        .groupby(keys, dropna=False)["is_top10"]
+        .mean()
+        .rename("top10_frequency")
+        .reset_index()
+    )
+    out = out.merge(top10, on=keys, how="left")
     out["demand_stability_label"] = np.where(
         out["n_demand_settings"] <= 1,
         "single_setting_not_assessed",

@@ -1,7 +1,7 @@
 """
 14_make_chompact_figures.py
 
-Create publication-style CHOmpact interpretation figures from v1.1 tables.
+Create evidence-aware industrial decision-support figures and executive summary.
 """
 import argparse
 import os
@@ -31,12 +31,10 @@ sys.path.insert(0, ROOT)
 from src.config import results_dir  # noqa: E402
 
 
-COLORS = {
-    "High": "#0072B2",
-    "Mother": "#6A6A6A",
-    "Moderate": "#009E73",
-    "Mid": "#009E73",
-    "Low": "#D55E00",
+EVIDENCE_COLORS = {
+    "measured_pathway_screening_signature": "#0072B2",
+    "model_emergent_pathway_hypothesis": "#D55E00",
+    "demand_conditioned_explanation": "#8A8A8A",
 }
 
 
@@ -65,29 +63,39 @@ def setup_style() -> None:
     })
 
 
-def save_pathway_activity(fba: pd.DataFrame, fig_dir: str) -> str:
-    if fba.empty:
+def compact_label(row: pd.Series) -> str:
+    pathway = str(row.get("chompact_pathway", ""))
+    subpathway = str(row.get("chompact_subpathway", ""))
+    reaction = str(row.get("reaction_id", ""))
+    if reaction and reaction != "nan":
+        return f"{reaction} | {subpathway}"
+    return f"{pathway} | {subpathway}"
+
+
+def save_measured_markers(measured: pd.DataFrame, fig_dir: str) -> str:
+    if measured.empty:
         return ""
-    use = fba.copy()
-    if "mode" in use.columns and use["mode"].notna().any():
-        preferred = "measured_demand" if "measured_demand" in set(use["mode"].astype(str)) else str(use["mode"].dropna().iloc[0])
-        use = use[use["mode"].astype(str).eq(preferred)]
-    top_paths = use.groupby("chompact_pathway")["median_abs_flux"].max().sort_values(ascending=False).head(12).index
-    use = use[use["chompact_pathway"].isin(top_paths)]
-    piv = use.pivot_table(index="chompact_pathway", columns="producer_group", values="median_abs_flux", aggfunc="median").fillna(0.0)
-    piv = piv.loc[piv.max(axis=1).sort_values().index]
-    fig, ax = plt.subplots(figsize=(8.5, max(4.2, 0.36 * len(piv) + 1.2)))
-    y = np.arange(len(piv))
-    width = 0.22
-    groups = [g for g in ["High", "Mother", "Moderate", "Mid", "Low"] if g in piv.columns]
-    for i, group in enumerate(groups):
-        ax.barh(y + (i - (len(groups) - 1) / 2) * width, piv[group], height=width, color=COLORS.get(group, "#999999"), label=group)
-    ax.set_yticks(y)
-    ax.set_yticklabels(piv.index)
-    ax.set_xlabel("Median absolute iCHO3K flux")
-    ax.set_title("CHOmpact pathway activity from iCHO3K pFBA\nmodel-predicted, not measured qMet")
+    use = measured.copy()
+    use["signed_high_low_difference"] = pd.to_numeric(
+        use["signed_high_low_difference"],
+        errors="coerce",
+    )
+    use = use[use["signed_high_low_difference"].notna()]
+    if use.empty:
+        return ""
+    use["label"] = use.apply(compact_label, axis=1)
+    use = use.sort_values("priority_score", ascending=False).head(15)
+    use = use.sort_values("signed_high_low_difference")
+    colors = np.where(use["signed_high_low_difference"] >= 0, "#0072B2", "#D55E00")
+    fig, ax = plt.subplots(figsize=(8.8, max(4.5, 0.36 * len(use) + 1.4)))
+    ax.barh(use["label"], use["signed_high_low_difference"], color=colors)
+    ax.axvline(0, color="#222222", lw=1)
+    ax.set_xlabel("Measured qMet difference: High - Low")
+    ax.set_title(
+        "Figure 12. Measured screening/feed-media markers\n"
+        "observed exchange phenotype; not a model-emergent mechanism"
+    )
     ax.grid(True, axis="x", ls=":", alpha=0.45)
-    ax.legend(loc="lower right")
     fig.tight_layout()
     path = os.path.join(fig_dir, "Fig12_chompact_pathway_activity.png")
     fig.savefig(path, bbox_inches="tight")
@@ -95,22 +103,25 @@ def save_pathway_activity(fba: pd.DataFrame, fig_dir: str) -> str:
     return path
 
 
-def save_fva_overlap(sep: pd.DataFrame, fig_dir: str) -> str:
-    if sep.empty:
+def save_model_robustness(model_pathways: pd.DataFrame, fig_dir: str) -> str:
+    if model_pathways.empty:
         return ""
-    use = sep[(sep.get("metric_family", "") == "FVA") & (sep.get("comparison", "") == "High_vs_Low")].copy()
-    if use.empty:
-        use = sep[sep.get("metric_family", "") == "FVA"].copy()
+    use = model_pathways.copy()
+    use = use[use["high_low_difference_source"].eq("model_emergent")]
+    use["robustness_score"] = pd.to_numeric(use["robustness_score"], errors="coerce")
+    use = use[use["robustness_score"].notna()]
     if use.empty:
         return ""
-    use["fva_non_overlap_score"] = pd.to_numeric(use["fva_non_overlap_score"], errors="coerce").fillna(0.0)
-    use["label"] = use["chompact_pathway"].astype(str) + " | " + use["chompact_subpathway"].astype(str)
-    top = use.sort_values("fva_non_overlap_score", ascending=False).head(15).iloc[::-1]
-    fig, ax = plt.subplots(figsize=(8.3, max(4.2, 0.34 * len(top) + 1.2)))
-    ax.barh(top["label"], top["fva_non_overlap_score"], color="#CC79A7")
-    ax.set_xlabel("FVA non-overlap score, High vs Low")
-    ax.set_title("Robust feasible-range separation\nmodel-predicted FVA interval comparison")
-    ax.set_xlim(0, max(1.0, float(top["fva_non_overlap_score"].max()) * 1.08))
+    use["label"] = use.apply(compact_label, axis=1)
+    use = use.sort_values("robustness_score", ascending=False).head(15).iloc[::-1]
+    fig, ax = plt.subplots(figsize=(8.8, max(4.5, 0.36 * len(use) + 1.4)))
+    ax.barh(use["label"], use["robustness_score"], color="#CC79A7")
+    ax.set_xlabel("FVA robustness score (0-100)")
+    ax.set_title(
+        "Figure 13. Model-emergent pathway robustness\n"
+        "product-demand-driven IgG reactions excluded from predictive ranking"
+    )
+    ax.set_xlim(0, 105)
     ax.grid(True, axis="x", ls=":", alpha=0.45)
     fig.tight_layout()
     path = os.path.join(fig_dir, "Fig13_chompact_fva_robustness.png")
@@ -119,16 +130,58 @@ def save_fva_overlap(sep: pd.DataFrame, fig_dir: str) -> str:
     return path
 
 
-def save_biomarker_ranking(ranked: pd.DataFrame, fig_dir: str) -> str:
-    if ranked.empty:
+def save_priority_confidence(candidates: pd.DataFrame, fig_dir: str) -> str:
+    if candidates.empty:
         return ""
-    use = ranked.head(15).copy().iloc[::-1]
-    use["label"] = use["chompact_pathway"].astype(str) + " | " + use["chompact_subpathway"].astype(str)
-    fig, ax = plt.subplots(figsize=(8.5, max(4.4, 0.36 * len(use) + 1.2)))
-    ax.barh(use["label"], use["composite_biomarker_score"], color="#56B4E9")
-    ax.set_xlabel("Composite pathway biomarker score")
-    ax.set_title("CHOmpact pathway biomarker priority\nmeasured qMet + iCHO3K FBA/FVA evidence")
-    ax.grid(True, axis="x", ls=":", alpha=0.45)
+    use = candidates.copy()
+    use["priority_score"] = pd.to_numeric(use["priority_score"], errors="coerce")
+    use["confidence_score"] = pd.to_numeric(use["confidence_score"], errors="coerce")
+    use = use[use["priority_score"].notna() & use["confidence_score"].notna()]
+    use = use[~use["high_low_difference_source"].eq("product_demand_driven")]
+    if use.empty:
+        return ""
+    use = use.sort_values("priority_score", ascending=False).head(20)
+    use["label"] = use.apply(compact_label, axis=1)
+    fig, ax = plt.subplots(figsize=(8.5, 6.4))
+    for candidate_type, group in use.groupby("candidate_type", dropna=False):
+        color = EVIDENCE_COLORS.get(candidate_type, "#777777")
+        size = 45 + 1.3 * pd.to_numeric(
+            group.get("evidence_coverage_score", 50),
+            errors="coerce",
+        ).fillna(50)
+        ax.scatter(
+            group["priority_score"],
+            group["confidence_score"],
+            s=size,
+            color=color,
+            alpha=0.78,
+            edgecolor="white",
+            linewidth=0.8,
+            label=str(candidate_type).replace("_", " "),
+        )
+        annotation_offsets = [(5, 10), (5, -13), (5, 22)]
+        for index, (_, row) in enumerate(group.sort_values("priority_score", ascending=False).head(3).iterrows()):
+            short_label = str(row.get("chompact_subpathway", row["label"]))
+            ax.annotate(
+                short_label,
+                (row["priority_score"], row["confidence_score"]),
+                xytext=annotation_offsets[index],
+                textcoords="offset points",
+                fontsize=7,
+                arrowprops={"arrowstyle": "-", "color": color, "lw": 0.6, "alpha": 0.7},
+            )
+    ax.axvline(60, color="#999999", lw=0.9, ls="--")
+    ax.axhline(60, color="#999999", lw=0.9, ls="--")
+    ax.set_xlim(0, 105)
+    ax.set_ylim(0, 105)
+    ax.set_xlabel("Priority score")
+    ax.set_ylabel("Confidence score")
+    ax.set_title(
+        "Figure 14. Candidate pathway signatures\n"
+        "priority and confidence shown separately; not validated biomarkers"
+    )
+    ax.grid(True, ls=":", alpha=0.35)
+    ax.legend(loc="lower right", fontsize=8)
     fig.tight_layout()
     path = os.path.join(fig_dir, "Fig14_chompact_biomarker_ranking.png")
     fig.savefig(path, bbox_inches="tight")
@@ -136,42 +189,104 @@ def save_biomarker_ranking(ranked: pd.DataFrame, fig_dir: str) -> str:
     return path
 
 
-def write_summary(dataset: str, chompact_dir: str, fig_paths: list, ranked: pd.DataFrame) -> None:
-    top_lines = []
-    if not ranked.empty:
-        for _, row in ranked.head(8).iterrows():
-            top_lines.append(
-                f"- {row['chompact_pathway']} / {row['chompact_subpathway']}: "
-                f"score={row['composite_biomarker_score']:.3g}, evidence={row['primary_evidence_type']}"
-            )
-    else:
-        top_lines.append("- No ranked pathway biomarkers were available.")
-    rel_figs = [os.path.relpath(p, ROOT).replace("\\", "/") for p in fig_paths if p]
-    text = f"""# CHOmpact v1.1 Executive Summary
+def format_rows(df: pd.DataFrame, fields: list, limit: int = 6) -> list:
+    if df.empty:
+        return ["- No eligible result was available."]
+    lines = []
+    for _, row in df.head(limit).iterrows():
+        label = compact_label(row)
+        details = []
+        for field, display in fields:
+            value = row.get(field, np.nan)
+            if pd.notna(value):
+                if isinstance(value, (int, float, np.integer, np.floating)):
+                    details.append(f"{display}={float(value):.1f}")
+                else:
+                    details.append(f"{display}={value}")
+        lines.append(f"- {label}: " + ", ".join(details))
+    return lines
+
+
+def write_summary(
+    dataset: str,
+    chompact_dir: str,
+    fig_paths: list,
+    measured: pd.DataFrame,
+    model: pd.DataFrame,
+    demand: pd.DataFrame,
+) -> None:
+    measured_lines = format_rows(
+        measured,
+        [
+            ("priority_score", "priority"),
+            ("confidence_score", "confidence"),
+            ("signed_high_low_difference", "High-Low qMet"),
+        ],
+    )
+    model_lines = format_rows(
+        model,
+        [
+            ("priority_score", "priority"),
+            ("confidence_score", "confidence"),
+            ("robustness_score", "FVA robustness"),
+        ],
+    )
+    demand_lines = format_rows(
+        demand,
+        [
+            ("priority_score", "explanation priority"),
+            ("confidence_score", "confidence"),
+        ],
+    )
+    rel_figs = [os.path.relpath(path, ROOT).replace("\\", "/") for path in fig_paths if path]
+    text = f"""# CHOmpact v1.1 PR1 Industrial Decision Summary
 
 Dataset: `{dataset}`
 
-## Interpretation Boundary
+## A. Measured Phenotype
 
-- iCHO3K is the calculation engine.
-- CHOmpact is used only as a pathway category and figure layer.
-- Measured exchange-rate/qMet evidence, model-predicted pFBA flux, and FVA feasible intervals are reported separately.
-- demand_scale is treated as sensitivity analysis, not a fixed biological truth.
+These are observed or measurement-derived screening/feed-media markers.
 
-## Top Pathway Biomarker Candidates
+{chr(10).join(measured_lines)}
 
-{chr(10).join(top_lines)}
+## B. Model-Emergent Oxidative and Metabolic Hypotheses
+
+These are predicted-only iCHO3K hypotheses under measured constraints. They are
+candidate pathway signatures and engineering target hypotheses, not measured
+intracellular fluxes.
+
+{chr(10).join(model_lines)}
+
+## C. Demand-Conditioned Production-Burden Explanations
+
+These results explain imposed measured IgG demand. They are excluded from
+independent predictive ranking.
+
+{chr(10).join(demand_lines)}
+
+## Interpretation Warnings
+
+- iCHO3K is the calculation engine; CHOmpact is an interpretation category layer.
+- Exchange reactions are measured/exchange-constraint-driven markers.
+- Internal ATP synthase, ETC, PDH, citrate synthase, TCA, and glutamine-catabolism signals are predicted-only model-emergent hypotheses.
+- IgG demand, assembly, heavy-chain, and light-chain reactions are product-demand-driven explanatory outputs.
+- Priority is not confidence. Missing evidence remains unavailable rather than being converted to zero.
+- No output in this report is a validated biomarker or validated engineering target.
 
 ## Figures
 
-{chr(10).join(f'- `{p}`' for p in rel_figs)}
+{chr(10).join(f"- `{path}`" for path in rel_figs)}
 """
-    with open(os.path.join(chompact_dir, "CHOmpact_v1_1_executive_summary.md"), "w", encoding="utf-8") as handle:
+    with open(
+        os.path.join(chompact_dir, "CHOmpact_v1_1_executive_summary.md"),
+        "w",
+        encoding="utf-8",
+    ) as handle:
         handle.write(text)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Create CHOmpact interpretation figures")
+    parser = argparse.ArgumentParser(description="Create evidence-aware CHOmpact decision-support figures")
     parser.add_argument("--dataset", default="practice_20aa", choices=["sowa2020", "practice_20aa", "own_experiment"])
     args = parser.parse_args()
 
@@ -182,17 +297,18 @@ def main() -> None:
     os.makedirs(fig_dir, exist_ok=True)
     os.makedirs(chompact_dir, exist_ok=True)
 
-    fba = read(os.path.join(chompact_dir, "chompact_pathway_fba_activity_scores.csv"))
-    sep = read(os.path.join(chompact_dir, "chompact_pathway_high_low_separation.csv"))
-    ranked = read(os.path.join(chompact_dir, "chompact_ranked_pathway_biomarkers.csv"))
+    measured = read(os.path.join(chompact_dir, "measured_screening_markers.csv"))
+    model = read(os.path.join(chompact_dir, "model_emergent_pathway_hypotheses.csv"))
+    demand = read(os.path.join(chompact_dir, "demand_conditioned_explanations.csv"))
+    candidates = read(os.path.join(chompact_dir, "pathway_level_candidates.csv"))
 
     paths = [
-        save_pathway_activity(fba, fig_dir),
-        save_fva_overlap(sep, fig_dir),
-        save_biomarker_ranking(ranked, fig_dir),
+        save_measured_markers(measured, fig_dir),
+        save_model_robustness(model, fig_dir),
+        save_priority_confidence(candidates, fig_dir),
     ]
-    write_summary(args.dataset, chompact_dir, paths, ranked)
-    print("[saved] CHOmpact figures:")
+    write_summary(args.dataset, chompact_dir, paths, measured, model, demand)
+    print("[saved] CHOmpact PR1 decision-support figures:")
     for path in paths:
         if path:
             print(f"  {os.path.relpath(path, ROOT)}")
