@@ -321,7 +321,82 @@ Fig14_chompact_biomarker_ranking.png
 
 ---
 
-## 9. Interpretation rules
+## 9. Glossary
+
+This glossary is intended to prevent future ambiguity between measured data, model constraints, model outputs, and engineering interpretation.
+
+| Term | Meaning in this project | Interpretation caution |
+|---|---|---|
+| qMet | Feed-corrected metabolite-specific exchange rate calculated from spent-media time course data. | Measured/derived extracellular rate, not an intracellular flux. |
+| pFBA | Parsimonious flux balance analysis. A model solution that satisfies constraints while minimizing total flux usage. | One optimal model solution, not a direct measurement. |
+| FVA | Flux variability analysis. For each reaction, reports feasible minimum and maximum flux under model constraints. | Feasible range, not statistical SD/error. |
+| FVA overlap | A condition comparison where two groups' feasible FVA intervals overlap. | Overlap suggests the model cannot strongly separate the groups for that reaction/pathway. |
+| FVA non-overlap | A condition comparison where feasible FVA intervals do not overlap. | Non-overlap is stronger model evidence for separation, but still model-based. |
+| Robustness score | A pathway or candidate score summarizing whether the signal remains stable across FVA ranges and/or demand-scale checks. | High robustness increases confidence but does not prove causality. |
+| Measured evidence | Evidence directly measured or directly derived from measurements, such as IgG, VCD, viability, qMet, uptake, and secretion. | Highest evidence class for experimental observation. |
+| Model-emergent evidence | Internal pFBA/FVA signal emerging from model constraints rather than directly measured outside the cell. | Hypothesis-generating unless independently validated. |
+| Constraint-driven | A result that follows directly from imposed model constraints, such as measured exchange bounds or product demand. | Should be reported descriptively, not as an independently discovered mechanism. |
+| Product-demand-driven | A model effect primarily caused by IgG/product demand constraints. | Important for production burden interpretation; do not overinterpret as measured metabolic regulation. |
+| Screening marker | A measured or model-derived feature useful for ranking or triaging clones. | Can be useful even when mechanism is incomplete. |
+| Engineering target | A pathway, reaction, or process proposed for perturbation or host/vector/process engineering. | Requires stronger biological plausibility and ideally validation beyond model output. |
+| Priority score | Ranking score used to order candidate pathways/reactions by effect size, robustness, and relevance. | Ranking aid, not a probability of success. |
+| Confidence score | Score representing how reliable the candidate is given evidence type, coverage, and robustness. | Should be interpreted together with evidence class and coverage. |
+
+---
+
+## 10. Figure dictionary
+
+All figure filenames, internal figure numbers, and `REPORT_SUMMARY.md` references should remain synchronized.
+
+| Figure | File | What it shows | How to interpret |
+|---|---|---|---|
+| Fig1 | `Fig1_IgG_timecourse.png` | IgG titer or production time course across culture days/groups. | Confirms productivity pattern and group separation. This is measured process output, not model prediction. |
+| Fig2 | `Fig2_rate_heatmap.png` | Exchange-rate heatmap for measured metabolites. | Shows extracellular uptake/secretion patterns that become model exchange constraints. |
+| Fig3 | `Fig3_lac_glc_ratio.png` | Lactate/glucose relationship or ratio. | Interprets overflow metabolism and glucose-lactate phenotype. |
+| Fig4 | `Fig4_high_vs_low_rates.png` | High-vs-Low or group-level exchange-rate differences. | Highlights measured qMet features that may explain or constrain downstream model results. |
+| Fig5 | `Fig5_central_mab_flux_heatmap.png` | Central/mAb-related pFBA flux state. | Model-predicted intracellular flux state under measured constraints. |
+| Fig6 | `Fig6_central_mab_flux_zscore.png` | Z-scored central/mAb flux pattern. | Useful for pattern comparison; z-score magnitude is relative within the plotted matrix. |
+| Fig7 | `Fig7_central_mab_flux_delta.png` | Group delta in central/mAb fluxes. | Highlights predicted reaction-level shifts between groups. |
+| Fig8 | `Fig8_pathway_scores_fva_overlap.png` | Pathway score with FVA overlap information. | Separates robust non-overlap candidates from ambiguous overlapping FVA candidates. |
+| Fig9 | `Fig9_full_fva_high_low_separation.png` | Full/internal genome-scale FVA group separation. | Broad model scan for reactions with potential feasible-range separation. |
+| Fig10 | `Fig10_full_fva_range_delta.png` | Full FVA range-width or range-delta summary. | Identifies reactions/pathways with changed flexibility or constraint tightness. |
+| Fig11 | `Fig11_summary_panel.png` | Summary panel of v1.0 outputs. | High-level dashboard for report-level interpretation. |
+| Fig12 | `Fig12_chompact_pathway_activity.png` | CHOmpact-labeled pathway activity from mapped iCHO3K outputs. | Biological vocabulary layer; does not recompute CHOmpact flux. |
+| Fig13 | `Fig13_chompact_fva_robustness.png` | CHOmpact pathway robustness from mapped FVA outputs. | Prioritizes pathways with stable model support across feasible ranges. |
+| Fig14 | `Fig14_chompact_biomarker_ranking.png` | CHOmpact biomarker/candidate ranking. | Should display priority, confidence, evidence type, pathway class, and coverage. |
+| SuppFig1 | `SuppFig1_data_qc_overview.png` | Data QC overview. | Use before interpreting model output; bad input quality invalidates downstream conclusions. |
+
+---
+
+## 11. Output dictionary
+
+Primary output files should be documented by biological meaning, modeling role, and evidence class.
+
+| Output file | Meaning | Primary evidence class | Typical use |
+|---|---|---|---|
+| `exchange_rates.csv` | Feed-corrected uptake/secretion rates calculated from time-course extracellular data. | Measured/derived qMet evidence. | Input constraints, extracellular phenotype comparison, screening marker discovery. |
+| `central_mab_flux_state.csv` | pFBA flux solution for selected central metabolism and mAb-related reactions. | Model-emergent pFBA evidence. | Compare predicted intracellular flux states between groups. |
+| `full_fva_all_combined_report.csv` | Genome-scale/internal FVA report combining feasible min/max ranges and group comparison metrics. | Model-emergent FVA evidence. | Broad reaction-level candidate discovery and coverage audit. |
+| `reaction_level_candidates.csv` | Ranked reaction-level candidate list derived from pFBA/FVA/pathway scoring. | Mixed; usually model-emergent unless tied to measured qMet. | Prioritize screening markers or engineering targets. |
+| `pathway_scores.csv` | v1.0 pathway-level scores summarized from reaction-level outputs. | Model-derived pathway evidence. | Pathway interpretation and report summary. |
+| `chompact_mapping_qc.csv` | QC table describing how iCHO3K reactions/metabolites map into CHOmpact interpretation groups. | Documentation/QC evidence. | Check pathway coverage before trusting CHOmpact summaries. |
+| `chompact_mapped_flux.csv` | iCHO3K pFBA flux values relabeled into CHOmpact pathway vocabulary. | Model-emergent pFBA evidence. | CHOmpact-based activity visualization. |
+| `chompact_mapped_fva.csv` | iCHO3K FVA ranges relabeled into CHOmpact pathway vocabulary. | Model-emergent FVA evidence. | CHOmpact robustness scoring. |
+| `chompact_mapped_fva_overlap.csv` | FVA overlap/non-overlap summary after CHOmpact mapping. | Model-emergent FVA evidence. | Identify robust vs ambiguous pathway separation. |
+| `chompact_mapped_measured_rates.csv` | Measured qMet rates mapped to CHOmpact pathway labels where possible. | Measured/derived evidence. | Distinguish measured extracellular support from internal model hypotheses. |
+| `chompact_pathway_fba_activity_scores.csv` | CHOmpact pathway activity scores from mapped pFBA outputs. | Model-emergent pFBA evidence. | Pathway activity ranking. |
+| `chompact_pathway_fva_robustness_scores.csv` | CHOmpact pathway robustness scores from mapped FVA intervals. | Model-emergent FVA evidence. | Confidence support for pathway ranking. |
+| `chompact_pathway_measured_qmet_scores.csv` | CHOmpact pathway scores based on measured exchange-rate evidence. | Measured/derived qMet evidence. | Measured evidence layer for candidate ranking. |
+| `chompact_pathway_high_low_separation.csv` | CHOmpact pathway-level High-vs-Low or group separation summary. | Mixed evidence. | Report-level group comparison. |
+| `chompact_demand_scale_sensitivity.csv` | Sensitivity of pathway/candidate scores to product-demand scaling. | Product-demand-driven model evidence. | Detect whether a candidate is mainly demand-driven. |
+| `chompact_robust_rank_across_demand_scales.csv` | Candidate/pathway ranking stability across demand scales. | Model robustness evidence. | Identify candidates that persist across product-demand assumptions. |
+| `chompact_ranked_pathway_biomarkers.csv` | Main ranked CHOmpact candidate table with priority/confidence/evidence annotations. | Mixed evidence, explicitly classified. | Final screening-marker and engineering-target triage. |
+| `chompact_top_pathway_biomarkers_for_report.csv` | Short report-facing subset of ranked CHOmpact candidates. | Mixed evidence, explicitly classified. | Executive summary and Fig14 input. |
+| `CHOmpact_v1_1_executive_summary.md` | Human-readable v1.1 CHOmpact interpretation summary. | Narrative summary. | Review, communication, and release validation. |
+
+---
+
+## 12. Interpretation rules
 
 ### Measured values
 
@@ -362,7 +437,70 @@ If a High-vs-Low difference is directly imposed as a boundary constraint, it is 
 
 ---
 
-## 10. v1.1 release criteria
+## 13. Release-polish checklist for v1.1-pr1
+
+### Documentation
+
+- [ ] Keep `MASTER.md`, `README.md`, `CHANGELOG.md`, and report wording synchronized.
+- [ ] Keep figure filenames, internal figure numbers, and `REPORT_SUMMARY.md` references synchronized.
+- [ ] Ensure all top-ranked candidates carry an evidence class: measured, model-emergent, constraint-driven, or product-demand-driven.
+- [ ] Ensure screening markers and engineering targets are not mixed without labeling.
+
+### Fig14 visualization polish
+
+Required Fig14 encoding:
+
+```text
+shape:
+  circle = model-emergent
+  triangle = measured
+
+color:
+  TCA
+  PPP
+  OXPHOS
+  Glutamine
+  Exchange
+  Other / unmapped
+
+hover / annotation fields:
+  pathway
+  priority
+  confidence
+  coverage
+  evidence type
+```
+
+Fig14 should not show only priority and confidence. Evidence type and pathway coverage must be visible either directly in the figure or in hover/label/exported table fields.
+
+### Coverage audit
+
+Priority biological coverage audit targets:
+
+```text
+PPP
+nucleotide metabolism
+lipid metabolism
+glycosylation / nucleotide-sugar donors
+```
+
+For each target, audit whether the signal is absent because biology is absent, model coverage is weak, mapping is missing, or the pathway is buried in full FVA outputs.
+
+### FVA source audit
+
+Confirm and document whether CHOmpact interpretation uses:
+
+```text
+focused FVA
+full FVA
+both, with explicit labels
+```
+
+v1.1 interpretation should prefer full FVA for broad discovery when available, but may use focused FVA for fast smoke tests only if the report clearly labels this limitation.
+
+---
+
+## 14. v1.1 release criteria
 
 Metabolomics v1.1 should not be merged to `main` or tagged until:
 
@@ -373,6 +511,9 @@ Metabolomics v1.1 should not be merged to `main` or tagged until:
 5. Figures 12-14 and the executive summary are generated correctly.
 6. FVA failure/retry logging is clarified enough not to confuse prior failed attempts with final success.
 7. `README.md`, `MASTER.md`, and `CHANGELOG.md` are updated.
+8. `MASTER.md` glossary, figure dictionary, and output dictionary are complete enough for future users to interpret v1.0/v1.1 outputs without old chat history.
+9. Fig14 shows priority, confidence, evidence type, pathway class, and coverage.
+10. PPP, nucleotide, lipid, and glycosylation coverage limitations are documented or fixed.
 
 The intended v1.1 tag will be:
 
@@ -382,10 +523,15 @@ Metabolomics_v1.1
 
 ---
 
-## 11. Future v1.2 candidates
+## 15. Future v1.2 candidates
 
 The following should be deferred to v1.2 or later unless the v1.1 review explicitly decides otherwise:
 
+- flux sampling
+- OCR/ECAR integration
+- 13C-MFA integration
+- iCHO2048s secretory model
+- transcriptomics constraints
 - expanded CHOmpact/iCHO3K pathway ontology
 - glycosylation and nucleotide-sugar donor module expansion
 - nucleotide and lipid metabolism interpretation modules
