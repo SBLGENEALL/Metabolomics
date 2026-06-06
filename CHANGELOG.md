@@ -39,6 +39,24 @@ feature/chompact-interpretation
 
 ---
 
+## [v1.2 - Unreleased]
+
+### Added
+
+- Phase 1 conservative PPP ontology expansion
+- Seven high-confidence PPP mappings covering ER oxidative PPP,
+  ribose-5-phosphate interconversion, and the PRPP connection
+- `docs/v1_2_phase1_ppp_mapping_audit.md` with inclusion, exclusion, and
+  validation rationale
+
+### Validation
+
+- PPP dictionary coverage increased from 6/39 (15.38%) to 13/39 (33.33%)
+- `practice_20aa` steps 10-14: PASS with focused-FVA fallback
+- Core iCHO3K FBA/pFBA/FVA calculation logic unchanged
+
+---
+
 ## [v1.1 - Unreleased]
 
 Branch:

@@ -54,6 +54,13 @@ MDHm,Malate dehydrogenase,TCA,TCA cycle,Malate dehydrogenase,Model-predicted TCA
 G6PDH2r,Glucose-6-phosphate dehydrogenase,PPP/Redox,Pentose phosphate pathway,Oxidative PPP,Model-predicted NADPH generation,internal,FALSE,FALSE,FALSE,1
 PGL,6-phosphogluconolactonase,PPP/Redox,Pentose phosphate pathway,Oxidative PPP,Model-predicted PPP flux,internal,FALSE,FALSE,FALSE,1
 GND,6-phosphogluconate dehydrogenase,PPP/Redox,Pentose phosphate pathway,Oxidative PPP,Model-predicted NADPH generation,internal,FALSE,FALSE,FALSE,1
+G6PDH2rer,"Glucose-6-phosphate dehydrogenase, endoplasmic reticulum",PENTOSE PHOSPHATE PATHWAY,Pentose phosphate pathway,Oxidative PPP,Model-predicted ER oxidative PPP NADPH generation,internal,FALSE,FALSE,FALSE,1
+PGLer,"6-phosphogluconolactonase, endoplasmic reticulum",PENTOSE PHOSPHATE PATHWAY,Pentose phosphate pathway,Oxidative PPP,Model-predicted ER oxidative PPP flux,internal,FALSE,FALSE,FALSE,1
+GNDer,"Phosphogluconate dehydrogenase, endoplasmic reticulum",PENTOSE PHOSPHATE PATHWAY,Pentose phosphate pathway,Oxidative PPP,Model-predicted ER oxidative PPP NADPH generation,internal,FALSE,FALSE,FALSE,1
+RPE,Ribulose 5-phosphate 3-epimerase,PENTOSE PHOSPHATE PATHWAY,Pentose phosphate pathway,Non-oxidative PPP,Model-predicted ribulose-5-phosphate to xylulose-5-phosphate interconversion,internal,FALSE,FALSE,FALSE,1
+RPI,Ribose-5-phosphate isomerase,PENTOSE PHOSPHATE PATHWAY,Pentose phosphate pathway,Non-oxidative PPP,Model-predicted ribose-5-phosphate and ribulose-5-phosphate interconversion,internal,FALSE,FALSE,FALSE,1
+r0249,"D-Ribose-5-phosphate ketol-isomerase, endoplasmic reticulum",PENTOSE PHOSPHATE PATHWAY,Pentose phosphate pathway,Non-oxidative PPP,Model-predicted ER ribose-5-phosphate and ribulose-5-phosphate interconversion,internal,FALSE,FALSE,FALSE,1
+PRPPS,Phosphoribosylpyrophosphate synthetase,PENTOSE PHOSPHATE PATHWAY,Pentose phosphate pathway,Ribose-5-phosphate / PRPP connection,Model-predicted connection from ribose-5-phosphate to nucleotide precursor PRPP,internal,FALSE,FALSE,FALSE,1
 TKT1,Transketolase,PPP/Redox,Pentose phosphate pathway,Non-oxidative PPP,Model-predicted PPP flux,internal,FALSE,FALSE,FALSE,1
 TKT2,Transketolase,PPP/Redox,Pentose phosphate pathway,Non-oxidative PPP,Model-predicted PPP flux,internal,FALSE,FALSE,FALSE,1
 TALA,Transaldolase,PPP/Redox,Pentose phosphate pathway,Non-oxidative PPP,Model-predicted PPP flux,internal,FALSE,FALSE,FALSE,1
