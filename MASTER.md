@@ -1,11 +1,84 @@
 # Metabolomics MASTER
 
-Current project baseline: **Metabolomics v1.0**  
-Validated branch: `feature/cleanup-step-order`  
-Validated dataset: `practice_20aa`  
-Validation status: passed on Linux/workstation with full FVA (`--fva_scope all`).
+This document is the single source of truth for the CHO Metabolomics project. Older chat history and legacy step numbers are superseded by this file.
 
-This document is the single source of truth for the current Metabolomics pipeline. Older chat history and legacy step numbers are superseded by this file.
+---
+
+## 0. Version policy
+
+Current stable release:
+
+```text
+Metabolomics_v1.0
+```
+
+Stable branch:
+
+```text
+main
+```
+
+Current development branch:
+
+```text
+v1.1
+```
+
+Current development target:
+
+```text
+Metabolomics_v1.1
+```
+
+Version meaning:
+
+```text
+v1.0
+  = validated iCHO3K production workflow
+  = cleanup-step-order work merged into main
+  = fixed by tag Metabolomics_v1.0
+
+v1.1
+  = CHOmpact interpretation integration release
+  = optional steps 10-14 added after the validated 00-09 workflow
+  = current branch for bugfixes, figure refinement, and interpretation polishing
+
+v1.1.x / v1.1-pr*
+  = v1.1-level fixes and polish only
+  = examples: logging cleanup, figure title/style fixes, score normalization, report wording
+  = merge back into v1.1 after local validation
+
+v1.2+
+  = future larger feature releases
+  = examples: expanded pathway ontology, glycosylation module, nucleotide/lipid modules, ER folding/secretion module, multi-omics integration, CHOmpact network map redesign
+```
+
+Branch interpretation:
+
+```text
+main
+  = latest validated stable branch
+  = currently equivalent to Metabolomics_v1.0
+
+v1.1
+  = active development/release-candidate branch for CHOmpact integration
+
+backup_before_archive_reorg
+  = historical backup branch
+```
+
+Historical branches:
+
+```text
+feature/cleanup-step-order
+  = completed v1.0 development branch
+  = merged into main
+  = deleted after v1.0 tag was created
+
+feature/chompact-interpretation
+  = original v1.1 development branch name
+  = renamed to v1.1
+```
 
 ---
 
@@ -16,14 +89,17 @@ The CHO Metabolomics pipeline converts fed-batch culture and spent-media metabol
 The pipeline is designed for:
 
 - clone/group comparison
-- High/Mother/Low productivity interpretation
+- productivity-group interpretation
 - measured exchange-rate constraint generation
 - pFBA flux-state comparison
 - focused central/mAb pathway FVA
 - full/internal genome-scale FVA
+- pathway-level interpretation
 - report and figure generation
 
 This pipeline is **not** a stand-alone IgG/mAb titer predictor.
+
+Actual clone grouping is intentionally deferred until real clone data are available. The code should support two-group, three-group, or multi-group comparisons rather than hard-coding High/Mother/Low assumptions.
 
 ---
 
@@ -44,28 +120,25 @@ Interpretation:
 
 ### CHOmpact
 
-Current v1.0 status:
-
-- not yet implemented as code
-- planned for v1.1 as an interpretation/visualization layer
-
-Planned v1.1 role:
+Role in v1.1:
 
 - pathway vocabulary
 - biological grouping
-- figure layout logic
-- CHO-specific pathway interpretation
+- figure/report interpretation layer
+- CHO-specific mechanistic framing
 
 Important principle:
 
-- CHOmpact should not replace iCHO3K as the calculation model.
-- CHOmpact should be used to summarize and visualize iCHO3K outputs.
+- CHOmpact must not replace iCHO3K as the calculation model.
+- CHOmpact must not be used to recompute fluxes.
+- CHOmpact lumped fluxes must not be reconstructed by summing iCHO3K reactions.
+- CHOmpact should summarize, label, and visualize iCHO3K outputs only.
 
 ---
 
 ## 3. Environment
 
-Validated environment:
+Validated v1.0 environment:
 
 - Linux workstation
 - Python 3.13 environment: `metabolomics_env_py313`
@@ -73,13 +146,15 @@ Validated environment:
 - GLPK solver
 - offline-compatible TSV input
 
-The v1.0 report generator no longer requires the optional `tabulate` package.
+The v1.0 report generator does not require the optional `tabulate` package.
+
+v1.1 steps 10-14 are interpretation-layer scripts that read v1.0 CSV outputs and should not require COBRApy unless the full 00-09 calculation pipeline is rerun.
 
 ---
 
-## 4. v1.0 step structure
+## 4. v1.0 validated workflow
 
-The v1.0 pipeline uses only clean sequential steps `00` through `09`.
+The v1.0 pipeline uses clean sequential steps `00` through `09`.
 
 ```text
 00_data_qc.py
@@ -96,11 +171,7 @@ The v1.0 pipeline uses only clean sequential steps `00` through `09`.
 
 Legacy step numbers such as 17, 10, 14, 21, 19, 20, and 6 are deprecated.
 
----
-
-## 5. Validated v1.0 command
-
-Validated full-model FVA route:
+Validated full-model FVA command:
 
 ```bash
 python run_pipeline.py \
@@ -128,6 +199,39 @@ python run_pipeline.py \
 
 ---
 
+## 5. v1.1 workflow
+
+The v1.1 branch adds optional interpretation steps after v1.0.
+
+```text
+10_map_to_chompact.py
+11_score_chompact_pathways.py
+12_demand_sensitivity.py
+13_rank_pathway_biomarkers.py
+14_make_chompact_figures.py
+```
+
+Run v1.1 extension after v1.0 outputs already exist:
+
+```bash
+python run_pipeline.py --dataset practice_20aa --steps 10,11,12,13,14
+```
+
+Run v1.0 plus v1.1 together:
+
+```bash
+python run_pipeline.py \
+  --dataset practice_20aa \
+  --input_format tsv \
+  --steps 00,01,02,03,04,05,06,07,08,09,10,11,12,13,14 \
+  --analysis_mode both \
+  --fva_scope all
+```
+
+Note: `--fva_scope all` in step 06 is computationally expensive. For quick v1.1 interpretation-layer smoke tests, run steps 10-14 only after existing v1.0 tables are available.
+
+---
+
 ## 6. Input data structure
 
 Practice TSV input:
@@ -148,7 +252,7 @@ data/raw/own_experiment/feed_composition.tsv
 
 ---
 
-## 7. Current outputs
+## 7. v1.0 outputs
 
 Main figures:
 
@@ -180,7 +284,44 @@ results/<dataset>/REPORT_SUMMARY.md
 
 ---
 
-## 8. Interpretation rules
+## 8. v1.1 outputs
+
+CHOmpact interpretation tables:
+
+```text
+results/<dataset>/tables/chompact/
+```
+
+Expected v1.1 outputs include:
+
+```text
+chompact_mapping_qc.csv
+chompact_mapped_flux.csv
+chompact_mapped_fva.csv
+chompact_mapped_fva_overlap.csv
+chompact_mapped_measured_rates.csv
+chompact_pathway_fba_activity_scores.csv
+chompact_pathway_fva_robustness_scores.csv
+chompact_pathway_measured_qmet_scores.csv
+chompact_pathway_high_low_separation.csv
+chompact_demand_scale_sensitivity.csv
+chompact_robust_rank_across_demand_scales.csv
+chompact_ranked_pathway_biomarkers.csv
+chompact_top_pathway_biomarkers_for_report.csv
+CHOmpact_v1_1_executive_summary.md
+```
+
+v1.1 figures:
+
+```text
+Fig12_chompact_pathway_activity.png
+Fig13_chompact_fva_robustness.png
+Fig14_chompact_biomarker_ranking.png
+```
+
+---
+
+## 9. Interpretation rules
 
 ### Measured values
 
@@ -192,6 +333,13 @@ Measured or directly derived from experimental data:
 - feed-corrected qMet / uptake / secretion rates
 - glucose, lactate, ammonia, amino acid exchange rates
 
+### Model-constrained values
+
+Measured rates imposed as model constraints:
+
+- exchange bounds derived from measured qMet
+- product demand constraints derived from measured IgG/qP
+
 ### Model-predicted values
 
 Model-derived:
@@ -202,28 +350,45 @@ Model-derived:
 - model objective values
 - pathway scores derived from iCHO3K outputs
 
-Reports must clearly distinguish measured evidence from model-predicted interpretation.
+Reports must clearly distinguish measured evidence from constrained model inputs and predicted model interpretation.
 
 ### FVA caution
 
-FVA ranges are model-based feasible ranges, not direct intracellular flux measurements. Very broad FVA intervals may reflect under-constrained reactions, alternate optima, or thermodynamic loops.
+FVA ranges are model-based feasible ranges, not direct intracellular flux measurements and not statistical error bars. Very broad FVA intervals may reflect under-constrained reactions, alternate optima, or thermodynamic loops.
+
+### Constraint-driven vs emergent interpretation
+
+If a High-vs-Low difference is directly imposed as a boundary constraint, it is constraint-driven and should be reported descriptively. Interior differences that persist after boundary equalization or demand-attribution checks may be treated as emergent model hypotheses.
 
 ---
 
-## 9. v1.1 direction
+## 10. v1.1 release criteria
 
-The next development branch should be:
+Metabolomics v1.1 should not be merged to `main` or tagged until:
+
+1. v1.0 steps 00-09 still pass on `practice_20aa`.
+2. v1.1 steps 10-14 pass after valid v1.0 outputs are present.
+3. CHOmpact outputs are non-empty and interpretable.
+4. `chompact_mapping_qc.csv` confirms acceptable mapping coverage.
+5. Figures 12-14 and the executive summary are generated correctly.
+6. FVA failure/retry logging is clarified enough not to confuse prior failed attempts with final success.
+7. `README.md`, `MASTER.md`, and `CHANGELOG.md` are updated.
+
+The intended v1.1 tag will be:
 
 ```text
-feature/chompact-interpretation
+Metabolomics_v1.1
 ```
 
-v1.1 goals:
+---
 
-1. build `data/chompact_pathway_mapping.csv`
-2. map iCHO3K reaction-level outputs to CHOmpact-style pathway categories
-3. score pathways using measured qMet separation, pFBA flux separation, and FVA robustness
-4. run demand-scale sensitivity analysis
-5. redesign figures and report around biological pathway interpretation
+## 11. Future v1.2 candidates
 
-v1.1 must preserve the v1.0 calculation engine and should not replace iCHO3K with CHOmpact.
+The following should be deferred to v1.2 or later unless the v1.1 review explicitly decides otherwise:
+
+- expanded CHOmpact/iCHO3K pathway ontology
+- glycosylation and nucleotide-sugar donor module expansion
+- nucleotide and lipid metabolism interpretation modules
+- ER folding/secretion burden module
+- publication-grade CHOmpact network map
+- multi-omics integration
