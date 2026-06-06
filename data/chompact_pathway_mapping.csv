@@ -60,7 +60,7 @@ GNDer,"Phosphogluconate dehydrogenase, endoplasmic reticulum",PENTOSE PHOSPHATE 
 RPE,Ribulose 5-phosphate 3-epimerase,PENTOSE PHOSPHATE PATHWAY,Pentose phosphate pathway,Non-oxidative PPP,Model-predicted ribulose-5-phosphate to xylulose-5-phosphate interconversion,internal,FALSE,FALSE,FALSE,1
 RPI,Ribose-5-phosphate isomerase,PENTOSE PHOSPHATE PATHWAY,Pentose phosphate pathway,Non-oxidative PPP,Model-predicted ribose-5-phosphate and ribulose-5-phosphate interconversion,internal,FALSE,FALSE,FALSE,1
 r0249,"D-Ribose-5-phosphate ketol-isomerase, endoplasmic reticulum",PENTOSE PHOSPHATE PATHWAY,Pentose phosphate pathway,Non-oxidative PPP,Model-predicted ER ribose-5-phosphate and ribulose-5-phosphate interconversion,internal,FALSE,FALSE,FALSE,1
-PRPPS,Phosphoribosylpyrophosphate synthetase,PENTOSE PHOSPHATE PATHWAY,Pentose phosphate pathway,Ribose-5-phosphate / PRPP connection,Model-predicted connection from ribose-5-phosphate to nucleotide precursor PRPP,internal,FALSE,FALSE,FALSE,1
+PRPPS,Phosphoribosylpyrophosphate synthetase,PENTOSE PHOSPHATE PATHWAY,Pentose phosphate pathway,PPP-linked nucleotide precursor bridge,Model-predicted ribose-5-phosphate to PRPP handoff into nucleotide biosynthesis; not core oxidative or non-oxidative PPP,internal,FALSE,FALSE,FALSE,1
 TKT1,Transketolase,PPP/Redox,Pentose phosphate pathway,Non-oxidative PPP,Model-predicted PPP flux,internal,FALSE,FALSE,FALSE,1
 TKT2,Transketolase,PPP/Redox,Pentose phosphate pathway,Non-oxidative PPP,Model-predicted PPP flux,internal,FALSE,FALSE,FALSE,1
 TALA,Transaldolase,PPP/Redox,Pentose phosphate pathway,Non-oxidative PPP,Model-predicted PPP flux,internal,FALSE,FALSE,FALSE,1

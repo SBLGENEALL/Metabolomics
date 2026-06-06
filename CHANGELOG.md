@@ -45,7 +45,8 @@ feature/chompact-interpretation
 
 - Phase 1 conservative PPP ontology expansion
 - Seven high-confidence PPP mappings covering ER oxidative PPP,
-  ribose-5-phosphate interconversion, and the PRPP connection
+  ribose-5-phosphate interconversion, and the PPP-linked nucleotide precursor
+  bridge
 - `docs/v1_2_phase1_ppp_mapping_audit.md` with inclusion, exclusion, and
   validation rationale
 
@@ -53,6 +54,9 @@ feature/chompact-interpretation
 
 - PPP dictionary coverage increased from 6/39 (15.38%) to 13/39 (33.33%)
 - `practice_20aa` steps 10-14: PASS with focused-FVA fallback
+- Focused-FVA scoring remains 6 PPP reactions; full-FVA workstation validation
+  is required for the seven newly mapped reactions
+- Mapping coverage does not automatically increase confidence
 - Core iCHO3K FBA/pFBA/FVA calculation logic unchanged
 
 ---

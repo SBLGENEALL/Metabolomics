@@ -19,10 +19,31 @@ cytosolic PPP reactions.
 | `RPE` | Non-oxidative PPP | Canonical ribulose-5-phosphate epimerase |
 | `RPI` | Non-oxidative PPP | Canonical ribose-5-phosphate isomerase |
 | `r0249` | Non-oxidative PPP | ER ribose-5-phosphate/ribulose-5-phosphate isomerase |
-| `PRPPS` | Ribose-5-phosphate / PRPP connection | Direct connection from R5P to the nucleotide precursor PRPP |
+| `PRPPS` | PPP-linked nucleotide precursor bridge | R5P to PRPP handoff into nucleotide biosynthesis; not core oxidative or non-oxidative PPP |
 
 Expected dictionary coverage changes from 6/39 (15.38%) to 13/39 (33.33%).
 This remains `partially_covered`.
+
+`PRPPS` is included to preserve the biologically important
+ribose-5-phosphate -> PRPP -> nucleotide biosynthesis handoff. It is a
+PPP-linked bridge and must not be interpreted as a core oxidative or
+non-oxidative PPP reaction.
+
+## Confidence Guardrails
+
+Mapping coverage is an interpretation/QC metric, not affirmative evidence that
+a pathway is active or robust. Increasing mapping coverage must not
+automatically increase `confidence_score`.
+
+- Coverage may cap or limit confidence when ontology support is incomplete.
+- FVA robustness, feasible-range separation, and reproducibility should
+  dominate confidence.
+- A newly mapped reaction that is available only in full FVA remains a
+  model-emergent hypothesis until robust FVA support is demonstrated.
+- Loop-prone, very broad, or under-constrained FVA ranges must not inflate
+  confidence merely because the reaction now has a pathway label.
+
+No confidence or ranking calculation was changed in this phase.
 
 ## Intentionally Excluded
 
@@ -62,7 +83,12 @@ Fig14 companion CSV: generated
 ```
 
 The validation worktree contained focused FVA but no full all/internal FVA
-table, so `auto` selected `focused_fva / central_mab_panel`. The seven newly
-mapped reactions are outside that focused panel. Their dictionary coverage was
-validated here, while their reaction-level FVA scoring requires a subsequent
-run with the validated full-FVA workstation output.
+table, so `auto` selected `focused_fva / central_mab_panel`. PPP dictionary
+mapping increased from 6 to 13 reactions, but focused-FVA scoring and ranking
+still covered only the original 6 reactions. The seven newly mapped reactions
+are outside that focused panel.
+
+Full-FVA workstation validation is required to confirm scoring behavior for
+the seven newly mapped reactions, including whether their feasible ranges are
+robust, separable, or loop-prone. The 33.33% mapping coverage result alone must
+not be interpreted as higher pathway confidence.

@@ -482,6 +482,13 @@ robustness_score
 evidence. Missing evidence remains `NA`; it is not converted to zero. Missing
 evidence lowers coverage and may limit confidence.
 
+Mapping coverage is an ontology/QC measure, not positive biological evidence.
+Improved mapping coverage must not automatically raise confidence. Coverage can
+cap or limit confidence, while FVA robustness, feasible-range separation, and
+reproducibility should dominate confidence. Newly mapped full-FVA-only,
+under-constrained, or loop-prone reactions remain model-emergent hypotheses and
+must not inflate confidence without robust FVA support.
+
 Current conservative confidence caps:
 
 ```text
