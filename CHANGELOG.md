@@ -49,6 +49,12 @@ feature/chompact-interpretation
   bridge
 - `docs/v1_2_phase1_ppp_mapping_audit.md` with inclusion, exclusion, and
   validation rationale
+- Phase 2 conservative nucleotide-sugar donor-supply ontology expansion
+- Sixteen high-confidence donor-supply mappings covering UDP-GlcNAc/GalNAc,
+  UDP-Hexose/Gal, UDP-GlcA, GDP-Mannose, GDP-Fucose, and CMP-Sialic acid
+  donor supply
+- `docs/v1_2_pr2_glyco_donor_mapping_audit.md` with donor-supply scope,
+  inclusion rationale, exclusion rationale, and glycan-quality guardrails
 
 ### Validation
 
@@ -56,6 +62,13 @@ feature/chompact-interpretation
 - `practice_20aa` steps 10-14: PASS with focused-FVA fallback
 - Focused-FVA scoring remains 6 PPP reactions; full-FVA workstation validation
   is required for the seven newly mapped reactions
+- Glycosylation donor-supply dictionary coverage increased from 0 to 16 mapped
+  reactions
+- PR2 mapping integrity was checked against iCHO3K reaction identifiers,
+  reaction names, subsystem annotations, and donor-supply roles
+- PR2 full-FVA workstation validation is still required to confirm
+  `chompact_domain_coverage_audit.csv`, Fig14, and ranking behavior for the
+  newly mapped donor-supply reactions
 - Mapping coverage does not automatically increase confidence
 - Core iCHO3K FBA/pFBA/FVA calculation logic unchanged
 

@@ -489,6 +489,13 @@ reproducibility should dominate confidence. Newly mapped full-FVA-only,
 under-constrained, or loop-prone reactions remain model-emergent hypotheses and
 must not inflate confidence without robust FVA support.
 
+v1.2 glycosylation-related ontology expansion is limited to nucleotide-sugar
+donor supply and glycosylation precursor supply. It must not be interpreted as
+glycan structure, glycan quality, fucosylation level, sialylation level, site
+occupancy, glycosyltransferase kinetics, or Golgi transport/localization
+prediction. Donor-supply mappings label existing iCHO3K model outputs; they do
+not add new measured evidence or increase confidence by themselves.
+
 Current conservative confidence caps:
 
 ```text
