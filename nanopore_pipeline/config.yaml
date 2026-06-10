@@ -1,0 +1,28 @@
+# Nanopore (MinION) reference-mapping pipeline configuration
+
+# Directory containing per-barcode fastq.gz folders from Guppy/Dorado
+# e.g. <fastq_dir>/barcode01/*.fastq.gz
+fastq_dir: data/raw/fastq_pass
+
+# Directory containing one reference FASTA per sample
+# (filenames must match the "reference_fasta" column in samplesheet.csv)
+reference_dir: references
+
+# Output directory. Each sample gets its own subfolder named after
+# samplesheet.csv "sample_name" — no manual renaming needed afterwards.
+results_dir: results
+
+# minimap2 mapping preset for ONT reads
+minimap2_preset: map-ont
+
+# Number of threads to use for minimap2 / samtools
+threads: 4
+
+# Minimum read length kept during QC filtering (NanoFilt), 0 disables filtering
+min_read_length: 200
+
+# Minimum mean read quality kept during QC filtering (NanoFilt), 0 disables filtering
+min_read_quality: 8
+
+# Variant calling backend: "bcftools" (default, always available) or "medaka"
+variant_caller: bcftools
