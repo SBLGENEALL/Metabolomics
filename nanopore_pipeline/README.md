@@ -1,34 +1,63 @@
 # Nanopore (MinION) Reference-Mapping Pipeline
 
-Oxford Nanopore MinION으로 시퀀싱한 결과(barcode별 fastq)를 reference FASTA에
+Oxford Nanopore MinION으로 시퀀싱한 결과(fastq)를 reference FASTA(벡터맵)에
 매핑하고, BAM/consensus FASTA/VCF/리포트를 생성하는 파이프라인입니다.
 
-## 핵심 아이디어: 이름 자동화
+## 핵심 아이디어: 폴더명 기반 자동 매칭
 
-여러 샘플을 분석하면 결과 파일이 `barcode01`, `barcode02`... 처럼 시퀀서가 붙인
-이름으로 나오는데, 실제로는 각각 다른 reference(샘플)에 대응됩니다. 이 파이프
-라인은 **`samplesheet.csv`에 barcode ↔ reference ↔ 샘플명을 한 번만 정의**해
-두면, 처음부터 모든 출력 파일을 샘플명으로 생성하므로 분석 후에 일일이 이름을
-바꿀 필요가 없습니다.
-
-이미 다른 도구(EPI2ME 등)로 분석을 끝낸 결과가 barcode 이름으로 남아있다면,
-`scripts/rename_outputs.py`로 한 번에 일괄 이름변경/정리할 수 있습니다.
-
-## 디렉터리 구조
+`references/`와 `data/raw/` 아래에 **"날짜_실험명" 폴더를 같은 이름으로** 만들어
+두면, 파이프라인이 그 둘을 자동으로 매칭해서 매핑 분석을 진행합니다.
+출력 파일은 항상 **reference FASTA 파일명(실제 벡터/샘플 이름)** 기준으로
+생성되므로, barcode 번호 같은 시퀀서 이름을 분석 후에 따로 바꿔줄 필요가
+없습니다.
 
 ```
 nanopore_pipeline/
-├── samplesheet.csv      # barcode_id, reference_fasta, sample_name 매핑표
-├── config.yaml          # 경로/파라미터 설정
-├── run_pipeline.sh       # 메인 파이프라인 (minimap2 -> samtools -> consensus -> variant call)
-├── scripts/
-│   └── rename_outputs.py # 기존 결과 일괄 이름변경 유틸리티
-├── references/           # 샘플별 reference FASTA (예: refA.fasta)
-└── data/raw/fastq_pass/  # MinKNOW/Guppy/Dorado의 barcode별 fastq.gz 폴더
-    ├── barcode01/
-    ├── barcode02/
-    └── ...
+├── config.yaml
+├── run_pipeline.sh
+├── references/
+│   └── 20260610_pUC19_test/        <- 실험 폴더 (날짜_실험명)
+│       └── pUC19_insertA.fasta     <- 벡터맵 전체 서열 (이게 "real name")
+├── data/raw/
+│   └── 20260610_pUC19_test/        <- 같은 이름의 폴더
+│       └── barcode01/              <- MinKNOW/Guppy/Dorado 결과 (서브폴더 있어도 됨)
+│           └── *.fastq.gz
+└── results/
+    └── 20260610_pUC19_test/
+        └── pUC19_insertA/           <- barcode01이 아니라 reference 이름으로 생성됨
+            ├── pUC19_insertA.sorted.bam / .bai
+            ├── pUC19_insertA.flagstat.txt
+            ├── pUC19_insertA.depth.txt
+            ├── pUC19_insertA.consensus.fasta
+            ├── pUC19_insertA.vcf.gz
+            └── pUC19_insertA_report.md
 ```
+
+- `references/<실험폴더>/` 안에 reference fasta가 **여러 개** 있으면, 그
+  실험 폴더의 fastq 전체를 각 reference에 대해 모두 매핑해서 reference별로
+  결과 폴더를 따로 만듭니다.
+- `data/raw/<실험폴더>/` 안의 fastq.gz는 barcode 서브폴더에 있든 바로 있든
+  상관없이 재귀적으로 모두 찾아서 합칩니다.
+- `references/`에는 있지만 `data/raw/`에 같은 이름 폴더가 없으면(또는 반대)
+  해당 실험은 건너뛰고 경고만 출력합니다.
+
+## 레퍼런스 FASTA 관련 Q&A
+
+**Q. 레퍼런스에는 읽고 싶은 벡터맵 전체를 넣으면 되나요?**
+네. 플라스미드/벡터의 전체 서열 1개를 FASTA 파일 하나에 넣으면 됩니다
+(원형이면 임의의 한 지점에서 잘라 선형 서열로 저장).
+
+**Q. Forward/Reverse를 나눠서 레퍼런스를 따로 만들어야 하나요?**
+아니요. minimap2는 reference의 양쪽 가닥을 모두 검사해서 정렬하므로
+정방향 서열 1개만 있으면 충분합니다.
+
+**Q. `.fa.amb`, `.fa.ann`, `.fa.bwt`, `.fa.pac`, `.fa.sa` 같은 인덱스 파일이
+필요한가요?**
+아니요. 그 파일들은 **BWA**용 인덱스입니다. 이 파이프라인은 ONT 데이터에
+적합한 **minimap2**를 사용하며, minimap2는 `.fasta` 원본 파일만으로 즉시
+인덱싱(메모리 내) 후 매핑하므로 별도 인덱스 파일을 만들 필요가 없습니다.
+(반복 실행 속도를 높이고 싶다면 `minimap2 -d ref.mmi ref.fasta`로 `.mmi`
+인덱스를 미리 만들어 둘 수는 있지만, 필수는 아닙니다.)
 
 ## 사전 준비
 
@@ -36,18 +65,10 @@ nanopore_pipeline/
    ```bash
    conda install -c bioconda -c conda-forge minimap2 samtools bcftools nanofilt
    ```
-2. `data/raw/fastq_pass/`에 barcode별 fastq.gz 폴더를 둔다.
-3. `references/`에 샘플별 reference FASTA를 넣는다.
-4. `samplesheet.csv`를 실제 매핑에 맞게 수정한다:
-
-   ```csv
-   barcode_id,reference_fasta,sample_name
-   barcode01,refA.fasta,SampleA
-   barcode02,refB.fasta,SampleB
-   barcode03,refC.fasta,SampleC
-   ```
-
-5. 필요하면 `config.yaml`에서 minimap2 preset, threads, QC 필터링 기준,
+2. `references/<날짜>_<실험명>/`에 벡터맵 fasta 파일을 넣는다.
+3. `data/raw/<날짜>_<실험명>/`에 (위와 동일한 폴더명으로) MinKNOW/Guppy/Dorado의
+   barcode별 fastq.gz 폴더를 넣는다.
+4. 필요하면 `config.yaml`에서 minimap2 preset, threads, QC 필터링 기준,
    variant caller(`bcftools` 또는 `medaka`)를 조정한다.
 
 ## 실행
@@ -57,30 +78,6 @@ cd nanopore_pipeline
 ./run_pipeline.sh
 ```
 
-각 샘플마다 `results/<sample_name>/` 폴더에 다음 파일들이 생성됩니다
-(전부 샘플명 기준, 추가 이름변경 불필요):
-
-- `<sample_name>.fastq.gz` — 병합된 raw reads (필요시 QC 필터링본 추가)
-- `<sample_name>.sorted.bam` / `.bai` — reference 정렬 결과
-- `<sample_name>.flagstat.txt` — 매핑 통계
-- `<sample_name>.depth.txt` — position별 coverage
-- `<sample_name>.consensus.fasta` — consensus 서열
-- `<sample_name>.vcf.gz` — variant calling 결과
-- `<sample_name>_report.md` — 샘플별 요약 리포트
-
-## 이미 분석을 끝낸 결과의 이름만 바꾸고 싶을 때
-
-```bash
-python scripts/rename_outputs.py \
-    --samplesheet samplesheet.csv \
-    --results-dir /path/to/existing_results \
-    --dry-run            # 먼저 변경 내역만 확인
-
-python scripts/rename_outputs.py \
-    --samplesheet samplesheet.csv \
-    --results-dir /path/to/existing_results \
-    --rename-content     # 파일/폴더명 + 파일 내부 헤더(fasta/vcf 등)까지 변경
-```
-
-`--dry-run`을 빼면 실제로 파일/폴더 이름이 변경됩니다 (`--rename-content`를
-주면 fasta 헤더, vcf 샘플명 등 텍스트 내용 안의 barcode ID도 함께 치환).
+`references/`와 `data/raw/` 아래의 모든 실험 폴더를 자동으로 스캔해서,
+이름이 일치하는 쌍에 대해서만 매핑을 수행합니다. 새 실험을 추가할 때는
+두 폴더 아래에 같은 이름의 폴더만 만들어주면 됩니다.
