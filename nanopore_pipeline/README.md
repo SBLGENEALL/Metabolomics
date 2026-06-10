@@ -59,6 +59,43 @@ nanopore_pipeline/
 (반복 실행 속도를 높이고 싶다면 `minimap2 -d ref.mmi ref.fasta`로 `.mmi`
 인덱스를 미리 만들어 둘 수는 있지만, 필수는 아닙니다.)
 
+## 시퀀싱 시작 "전" 단계: 96-well sample sheet 자동 생성 (권장)
+
+핵심 요약: **시퀀싱 시작 전에, 각 well(barcode)에 reference 파일명과 동일한
+alias를 매핑한 sample sheet를 MinKNOW에 등록해두면, basecalling/demultiplexing
+결과 폴더가 처음부터 reference 이름으로 생성됩니다.** 그러면 이름을 맞추는
+별도 작업 없이 바로 `data/raw/<실험폴더>/`에 옮기고 `run_pipeline.sh`만
+실행하면 됩니다.
+
+1. `references/<날짜>_<실험명>/`에 96-well 각각에 해당하는 reference fasta를
+   넣는다 (파일명 = 원하는 최종 샘플명).
+2. sample sheet를 자동 생성한다:
+   ```bash
+   python scripts/generate_samplesheet.py \
+       --references references/20260610_pUC19_test \
+       --experiment-id 20260610_pUC19_test \
+       --output references/20260610_pUC19_test/sample_sheet.csv
+   ```
+   - 기본적으로 `references/<실험폴더>/` 안의 fasta 파일을 **이름순**으로
+     barcode01, barcode02, ... 에 순서대로 배정합니다.
+   - plate 배치 순서가 다르면 `--order order.txt` (한 줄에 reference 이름
+     하나씩, plate 순서대로)로 직접 지정할 수 있습니다.
+3. 생성된 `sample_sheet.csv`를 MinKNOW 실행 화면의 **Start run -> Sample
+   sheet -> Browse**에서 불러온 뒤 시퀀싱을 시작한다.
+4. Basecalling/demultiplexing이 끝나면 출력 폴더가 `barcode01` 대신
+   sample sheet의 `alias`(= reference 파일명)로 생성된다.
+5. 그 출력 폴더 전체를 `data/raw/<날짜>_<실험명>/` (references와 같은
+   폴더명) 아래로 옮기고 `./run_pipeline.sh`를 실행한다.
+
+> 이미 barcode 번호로 시퀀싱이 끝난 데이터가 있고, 그 실험 폴더 안에
+> reference가 **1개뿐**이라면 이 단계는 건너뛰어도 됩니다 —
+> `data/raw/<날짜>_<실험명>/barcode01/...` 형태 그대로 두면
+> `run_pipeline.sh`가 그 fastq를 해당 reference 1개에 매핑합니다.
+> reference가 **여러 개**인 실험이라면, 각 reference의 fastq가 어느
+> 것인지 구분이 필요하므로 위 sample sheet 방식(또는 수동으로
+> `data/raw/<실험폴더>/<reference이름>/`에 해당 fastq를 넣는 방식)을
+> 사용해야 합니다.
+
 ## 사전 준비
 
 1. 필요한 도구 설치 (conda 권장):
@@ -67,7 +104,7 @@ nanopore_pipeline/
    ```
 2. `references/<날짜>_<실험명>/`에 벡터맵 fasta 파일을 넣는다.
 3. `data/raw/<날짜>_<실험명>/`에 (위와 동일한 폴더명으로) MinKNOW/Guppy/Dorado의
-   barcode별 fastq.gz 폴더를 넣는다.
+   barcode별(또는 alias별) fastq.gz 폴더를 넣는다.
 4. 필요하면 `config.yaml`에서 minimap2 preset, threads, QC 필터링 기준,
    variant caller(`bcftools` 또는 `medaka`)를 조정한다.
 

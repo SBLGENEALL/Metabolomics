@@ -4,16 +4,23 @@
 #
 # Folder-name based matching: for every experiment folder that exists
 # under BOTH references_dir and data_dir (same folder name, e.g.
-# "20260610_pUC19_test"), the pipeline maps that experiment's reads
-# against the matching reference(s). Output files are named after the
-# reference FASTA (the real vector/sample name), not the barcode ID,
-# so no manual renaming is needed afterwards.
+# "20260610_pUC19_test"), the pipeline maps reads against the matching
+# reference(s). Output files are named after the reference FASTA (the
+# real vector/sample name), not the barcode ID, so no manual renaming
+# is needed afterwards.
 #
 # Layout:
 #   references/<date>_<experiment_name>/<reference_name>.fasta
-#   data/raw/<date>_<experiment_name>/...        (fastq.gz, optionally
-#                                                   inside barcodeXX/ subfolders)
+#   data/raw/<date>_<experiment_name>/...
 #   results/<date>_<experiment_name>/<reference_name>/...
+#
+# Per-reference fastq matching, in order of preference:
+#   1. data/raw/<experiment>/<reference_name>/**/*.fastq(.gz)
+#      (e.g. demultiplexed with a sample sheet whose alias = reference_name
+#      -- see scripts/generate_samplesheet.py)
+#   2. Any fastq(.gz) directly under data/raw/<experiment>/ that is NOT
+#      inside another reference-named subfolder (single-reference-per-
+#      experiment case, e.g. data/raw/<experiment>/barcode01/*.fastq.gz)
 #
 # Usage:
 #   ./run_pipeline.sh [config.yaml]
@@ -75,50 +82,33 @@ for EXP_DIR in "$REF_ROOT"/*/; do
         continue
     fi
 
-    # Collect all fastq(.gz) files for this experiment, recursively
-    # (handles both flat layout and barcodeXX/ subfolders)
-    FASTQ_FILES=()
-    while IFS= read -r -d '' f; do FASTQ_FILES+=("$f"); done \
-        < <(find "$DATA_EXP_DIR" -type f \( -name "*.fastq.gz" -o -name "*.fastq" \) -print0)
-
-    if [[ ${#FASTQ_FILES[@]} -eq 0 ]]; then
-        echo "  [SKIP] no fastq files found under $DATA_EXP_DIR" >&2
-        continue
-    fi
+    # All reference names in this experiment, used to detect per-reference
+    # fastq subfolders vs. the shared "leftover" pool below.
+    REF_NAMES=()
+    for REF_PATH in "${REF_FILES[@]}"; do
+        REF_FILE="$(basename "$REF_PATH")"
+        REF_NAMES+=("${REF_FILE%.*}")
+    done
 
     EXP_RESULTS_DIR="$RESULTS_ROOT/$EXP_NAME"
     mkdir -p "$EXP_RESULTS_DIR"
 
-    # 1. Merge all reads for this experiment once (shared across references)
-    MERGED_FASTQ="$EXP_RESULTS_DIR/${EXP_NAME}.merged.fastq.gz"
-    if [[ ! -s "$MERGED_FASTQ" ]]; then
-        echo "  [1/5] Merging $(printf '%d' ${#FASTQ_FILES[@]}) read file(s) -> $(basename "$MERGED_FASTQ")"
-        : > "${MERGED_FASTQ%.gz}.tmp"
-        for f in "${FASTQ_FILES[@]}"; do
-            if [[ "$f" == *.gz ]]; then
-                zcat "$f" >> "${MERGED_FASTQ%.gz}.tmp"
-            else
-                cat "$f" >> "${MERGED_FASTQ%.gz}.tmp"
-            fi
+    # Fastq files directly under DATA_EXP_DIR that are NOT inside a
+    # subfolder named after one of this experiment's references. Used as
+    # the fallback pool for references that don't have their own subfolder
+    # (e.g. a single reference per experiment with data/raw/<exp>/barcode01/).
+    SHARED_FASTQ=()
+    while IFS= read -r -d '' f; do
+        rel="${f#"$DATA_EXP_DIR"/}"
+        top="${rel%%/*}"
+        is_ref_dir=false
+        for r in "${REF_NAMES[@]}"; do
+            if [[ "$top" == "$r" ]]; then is_ref_dir=true; break; fi
         done
-        gzip -c "${MERGED_FASTQ%.gz}.tmp" > "$MERGED_FASTQ"
-        rm -f "${MERGED_FASTQ%.gz}.tmp"
-    else
-        echo "  [1/5] Merged reads already exist, skipping"
-    fi
+        if [[ "$is_ref_dir" == false ]]; then SHARED_FASTQ+=("$f"); fi
+    done < <(find "$DATA_EXP_DIR" -type f \( -name "*.fastq.gz" -o -name "*.fastq" \) -print0)
 
-    # 2. Optional QC filtering with NanoFilt
-    READS_FOR_MAPPING="$MERGED_FASTQ"
-    if [[ "$MIN_LEN" -gt 0 || "$MIN_QUAL" -gt 0 ]] && command -v NanoFilt >/dev/null 2>&1; then
-        FILTERED_FASTQ="$EXP_RESULTS_DIR/${EXP_NAME}.filtered.fastq.gz"
-        echo "  [2/5] QC filtering (length>=$MIN_LEN, quality>=$MIN_QUAL) -> $(basename "$FILTERED_FASTQ")"
-        zcat "$MERGED_FASTQ" | NanoFilt -l "$MIN_LEN" -q "$MIN_QUAL" | gzip > "$FILTERED_FASTQ"
-        READS_FOR_MAPPING="$FILTERED_FASTQ"
-    else
-        echo "  [2/5] QC filtering skipped"
-    fi
-
-    # 3-5. Map against every reference fasta found in this experiment folder
+    # 1-5. Map against every reference fasta found in this experiment folder
     for REF_PATH in "${REF_FILES[@]}"; do
         REF_FILE="$(basename "$REF_PATH")"
         REF_NAME="${REF_FILE%.*}"
@@ -127,6 +117,53 @@ for EXP_DIR in "$REF_ROOT"/*/; do
 
         echo ""
         echo "  --- Reference: $REF_FILE -> results/$EXP_NAME/$REF_NAME/ ---"
+
+        # Pick the fastq files for this reference: a same-named subfolder
+        # takes priority over the shared pool.
+        REF_SUBDIR="$DATA_EXP_DIR/$REF_NAME"
+        FASTQ_FILES=()
+        if [[ -d "$REF_SUBDIR" ]]; then
+            while IFS= read -r -d '' f; do FASTQ_FILES+=("$f"); done \
+                < <(find "$REF_SUBDIR" -type f \( -name "*.fastq.gz" -o -name "*.fastq" \) -print0)
+            echo "  Reads: ${#FASTQ_FILES[@]} file(s) from $(basename "$REF_SUBDIR")/ (matched by name)"
+        else
+            FASTQ_FILES=("${SHARED_FASTQ[@]}")
+            echo "  Reads: ${#FASTQ_FILES[@]} file(s) from $EXP_NAME/ (shared, single-reference layout)"
+        fi
+
+        if [[ ${#FASTQ_FILES[@]} -eq 0 ]]; then
+            echo "  [SKIP] no fastq files found for reference $REF_NAME" >&2
+            continue
+        fi
+
+        # 1. Merge reads
+        MERGED_FASTQ="$SAMPLE_DIR/${REF_NAME}.merged.fastq.gz"
+        if [[ ! -s "$MERGED_FASTQ" ]]; then
+            echo "  [1/5] Merging ${#FASTQ_FILES[@]} read file(s) -> $(basename "$MERGED_FASTQ")"
+            : > "${MERGED_FASTQ%.gz}.tmp"
+            for f in "${FASTQ_FILES[@]}"; do
+                if [[ "$f" == *.gz ]]; then
+                    zcat "$f" >> "${MERGED_FASTQ%.gz}.tmp"
+                else
+                    cat "$f" >> "${MERGED_FASTQ%.gz}.tmp"
+                fi
+            done
+            gzip -c "${MERGED_FASTQ%.gz}.tmp" > "$MERGED_FASTQ"
+            rm -f "${MERGED_FASTQ%.gz}.tmp"
+        else
+            echo "  [1/5] Merged reads already exist, skipping"
+        fi
+
+        # 2. Optional QC filtering with NanoFilt
+        READS_FOR_MAPPING="$MERGED_FASTQ"
+        if [[ "$MIN_LEN" -gt 0 || "$MIN_QUAL" -gt 0 ]] && command -v NanoFilt >/dev/null 2>&1; then
+            FILTERED_FASTQ="$SAMPLE_DIR/${REF_NAME}.filtered.fastq.gz"
+            echo "  [2/5] QC filtering (length>=$MIN_LEN, quality>=$MIN_QUAL) -> $(basename "$FILTERED_FASTQ")"
+            zcat "$MERGED_FASTQ" | NanoFilt -l "$MIN_LEN" -q "$MIN_QUAL" | gzip > "$FILTERED_FASTQ"
+            READS_FOR_MAPPING="$FILTERED_FASTQ"
+        else
+            echo "  [2/5] QC filtering skipped"
+        fi
 
         # 3. Map to reference with minimap2, sort with samtools
         SORTED_BAM="$SAMPLE_DIR/${REF_NAME}.sorted.bam"
