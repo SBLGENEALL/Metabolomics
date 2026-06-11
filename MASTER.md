@@ -495,6 +495,15 @@ glycan structure, glycan quality, fucosylation level, sialylation level, site
 occupancy, glycosyltransferase kinetics, or Golgi transport/localization
 prediction. Donor-supply mappings label existing iCHO3K model outputs; they do
 not add new measured evidence or increase confidence by themselves.
+Donor-supply flux is not nucleotide-sugar concentration, intracellular pool
+size, compartment-specific availability, or Golgi-accessible donor abundance.
+UDP-GlcA donor-supply flux is not an mAb-specific glycosylation marker.
+
+The v1.2 PR2 donor ontology distinguishes 12 independent core mappings from
+4 non-independent mappings: `GALT` and `MAN1PT2` are model alternatives,
+`r0782` is a cofactor alternative, and `CMPSAS` is a compartment duplicate.
+Non-independent mappings remain visible for model audit but are not eligible as
+independent predictive reaction candidates.
 
 Current conservative confidence caps:
 

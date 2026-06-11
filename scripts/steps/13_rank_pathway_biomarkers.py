@@ -61,11 +61,47 @@ DOMAIN_PATTERNS = {
         re.I,
     ),
     "nucleotide-sugar donor metabolism": re.compile(
-        r"nucleotide.?sugar|udp.?glc|udp.?gal|udp.?glcnac|udp.?galnac|"
-        r"gdp.?mann|gdp.?fuc|cmp.?sial",
+        r"nucleotide.?sugar|udp[\s_-]?(?:n[\s_-]?acetyl)?gluc|"
+        r"udp[\s_-]?(?:n[\s_-]?acetyl)?galact|udpgluc|udpgalact|"
+        r"udp[\s_-]?glc(?:nac|a)?|udp[\s_-]?gal(?:nac)?|"
+        r"gdp[\s_-]?(?:d[\s_-]?)?mann|gdp[\s_-]?(?:l[\s_-]?)?fuc|"
+        r"cmp[\s_-]?(?:n[\s_-]?acetylneuramin|neu5ac|sial)",
         re.I,
     ),
 }
+
+DONOR_DOMAIN = "nucleotide-sugar donor metabolism"
+DONOR_PATHWAY = "Glycosylation donor supply"
+DONOR_MAPPING_COLUMNS = [
+    "donor_class",
+    "donor_metabolite",
+    "reaction_role",
+    "canonical_status",
+    "independent_evidence_group",
+    "glycan_relevance",
+    "mapping_guardrail",
+]
+DONOR_SUPPLY_METABOLITES = {
+    "uacgam_c",
+    "udpacgal_c",
+    "udpg_c",
+    "udpgal_c",
+    "udpglcur_c",
+    "gdpmann_c",
+    "gdpddman_c",
+    "gdpfuc_c",
+    "cmpacna_c",
+    "cmpacna_n",
+}
+NON_DONOR_SUPPLY_SUBSYSTEMS = re.compile(
+    r"transport|keratan|chondroitin|heparan|glycosphingolipid|sphingolipid",
+    re.I,
+)
+NON_DONOR_SUPPLY_REACTION_NAMES = re.compile(
+    r"glycosyltransferase|fucosyltransferase|sialyltransferase|"
+    r"galactosyltransferase|glucosyltransferase|galactosaminidase",
+    re.I,
+)
 
 
 def read(path: str) -> pd.DataFrame:
@@ -483,6 +519,79 @@ def domain_reaction_ids(records: list, pattern: re.Pattern) -> set:
     }
 
 
+def donor_supply_model_ids(records: list) -> set:
+    """Return donor/precursor producers within the PR2 scientific boundary."""
+    ids = set()
+    for record in records:
+        subsystem = str(record.get("subsystem", ""))
+        name = str(record.get("name", ""))
+        if NON_DONOR_SUPPLY_SUBSYSTEMS.search(subsystem):
+            continue
+        if NON_DONOR_SUPPLY_REACTION_NAMES.search(name):
+            continue
+        metabolites = record.get("metabolites", {}) or {}
+        produces_activated_donor = any(
+            metabolite_id in DONOR_SUPPLY_METABOLITES
+            and float(coefficient) > 0.0
+            for metabolite_id, coefficient in metabolites.items()
+        )
+        if produces_activated_donor:
+            ids.add(str(record.get("id", "")))
+    return ids
+
+
+def normalized_domain_text(values: list) -> str:
+    text = " ".join(
+        "" if pd.isna(value) else str(value)
+        for value in values
+    ).lower()
+    return re.sub(r"[^a-z0-9]+", " ", text).strip()
+
+
+def classify_audit_domain(values: list, donor_class: object = "") -> str:
+    """Classify candidates and mappings with one deterministic ontology."""
+    donor_text = "" if pd.isna(donor_class) else str(donor_class).strip()
+    text = normalized_domain_text(values + [donor_text])
+    if donor_text or normalized_domain_text([DONOR_PATHWAY]) in text:
+        return DONOR_DOMAIN
+    if DOMAIN_PATTERNS["PPP"].search(text):
+        return "PPP"
+    if DOMAIN_PATTERNS["lipid metabolism"].search(text):
+        return "lipid metabolism"
+    if DOMAIN_PATTERNS[DONOR_DOMAIN].search(text):
+        return DONOR_DOMAIN
+    if DOMAIN_PATTERNS["glycosylation"].search(text):
+        return "glycosylation"
+    if DOMAIN_PATTERNS["nucleotide metabolism"].search(text):
+        return "nucleotide metabolism"
+    return ""
+
+
+def load_mapping_ontology(path: str) -> pd.DataFrame:
+    mapping = read(path)
+    if mapping.empty or "reaction_id" not in mapping.columns:
+        return pd.DataFrame()
+    for col in DONOR_MAPPING_COLUMNS:
+        if col not in mapping.columns:
+            mapping[col] = ""
+    mapping["ontology_domain"] = mapping.apply(
+        lambda row: classify_audit_domain(
+            [
+                row.get("chompact_pathway", ""),
+                row.get("chompact_subpathway", ""),
+                row.get("reaction_id", ""),
+                row.get("reaction_name", ""),
+            ],
+            row.get("donor_class", ""),
+        ),
+        axis=1,
+    )
+    mapping["canonical_status"] = (
+        mapping["canonical_status"].fillna("").astype(str).str.strip()
+    )
+    return mapping
+
+
 def ids_from_csv(path: str) -> set:
     df = read(path)
     if df.empty:
@@ -514,14 +623,34 @@ def make_domain_coverage_audit(
             model_records = json.load(handle).get("reactions", [])
     focused_ids = ids_from_csv(os.path.join(tables, "central_mab_fva_report.csv"))
     full_ids = combined_full_fva_ids(tables)
-    mapping_ids = ids_from_csv(mapping_path)
+    mapping = load_mapping_ontology(mapping_path)
     scored_ids = set(reaction_sep.get("reaction_id", pd.Series(dtype=str)).dropna().astype(str))
     ranked_ids = set(reaction_candidates.get("reaction_id", pd.Series(dtype=str)).dropna().astype(str))
 
     rows = []
     for domain, pattern in DOMAIN_PATTERNS.items():
-        model_ids = domain_reaction_ids(model_records, pattern)
-        mapped_domain = model_ids & mapping_ids
+        model_ids = (
+            donor_supply_model_ids(model_records)
+            if domain == DONOR_DOMAIN
+            else domain_reaction_ids(model_records, pattern)
+        )
+        domain_mapping = (
+            mapping[mapping["ontology_domain"].eq(domain)]
+            if not mapping.empty
+            else pd.DataFrame()
+        )
+        domain_mapping_ids = set(
+            domain_mapping.get("reaction_id", pd.Series(dtype=str)).dropna().astype(str)
+        )
+        mapped_domain = model_ids & domain_mapping_ids
+        core_mapping_ids = set(
+            domain_mapping.loc[
+                domain_mapping["canonical_status"].isin(["", "core"]),
+                "reaction_id",
+            ].dropna().astype(str)
+        )
+        effective_core_domain = mapped_domain & core_mapping_ids
+        alternative_domain = mapped_domain - effective_core_domain
         focused_domain = model_ids & focused_ids
         full_domain = model_ids & full_ids
         scored_domain = model_ids & scored_ids
@@ -531,10 +660,15 @@ def make_domain_coverage_audit(
             if model_ids
             else np.nan
         )
+        effective_core_percent = (
+            100.0 * len(effective_core_domain) / len(model_ids)
+            if model_ids
+            else np.nan
+        )
         if not model_ids:
             status = "unavailable"
             reason = "No matching iCHO3K reactions were identified; activity was not assessed."
-        elif mapped_domain and mapping_percent >= 50.0 and ranked_domain:
+        elif effective_core_domain and effective_core_percent >= 50.0 and ranked_domain:
             status = "adequately_covered"
             reason = "Substantial mapping coverage and ranked evidence are available."
         elif mapped_domain:
@@ -549,15 +683,25 @@ def make_domain_coverage_audit(
         else:
             status = "mapping_missing"
             reason = "Biology exists in iCHO3K/FVA but CHOmpact mapping is missing."
+        if domain == DONOR_DOMAIN and mapped_domain:
+            reason = (
+                f"{len(mapped_domain)} raw donor-supply mappings include "
+                f"{len(effective_core_domain)} independent core and "
+                f"{len(alternative_domain)} model-alternative/duplicate reactions; "
+                "absence from ranking is not zero activity."
+            )
         rows.append({
             "domain": domain,
             "model_reaction_count": len(model_ids),
             "focused_fva_reaction_count": len(focused_domain),
             "full_fva_reaction_count": len(full_domain),
             "mapped_reaction_count": len(mapped_domain),
+            "effective_independent_core_mapping_count": len(effective_core_domain),
+            "model_alternative_mapping_count": len(alternative_domain),
             "scored_reaction_count": len(scored_domain),
             "ranked_reaction_count": len(ranked_domain),
             "mapping_coverage_percent": mapping_percent,
+            "effective_core_mapping_coverage_percent": effective_core_percent,
             "analysis_status": status,
             "limitation_reason": reason,
         })
@@ -565,21 +709,43 @@ def make_domain_coverage_audit(
 
 
 def candidate_audit_domain(row: pd.Series) -> str:
-    text = " ".join(
-        str(row.get(col, ""))
-        for col in ["chompact_pathway", "chompact_subpathway", "reaction_id"]
-    ).lower()
-    if "pentose" in text or "ppp" in text:
-        return "PPP"
-    if "nucleotide" in text or "purine" in text or "pyrimidine" in text:
-        return "nucleotide metabolism"
-    if any(token in text for token in ["lipid", "fatty acid", "sphingo", "phospholipid"]):
-        return "lipid metabolism"
-    if any(token in text for token in ["nucleotide-sugar", "udp-glc", "gdp-fuc", "cmp-sial"]):
-        return "nucleotide-sugar donor metabolism"
-    if any(token in text for token in ["glycosyl", "glycan", "fucosyl", "sialyl"]):
-        return "glycosylation"
-    return ""
+    return classify_audit_domain(
+        [
+            row.get("chompact_pathway", ""),
+            row.get("chompact_subpathway", ""),
+            row.get("reaction_id", ""),
+            row.get("reaction_name", ""),
+            row.get("donor_metabolite", ""),
+        ],
+        row.get("donor_class", ""),
+    )
+
+
+def attach_mapping_metadata(df: pd.DataFrame, mapping: pd.DataFrame) -> pd.DataFrame:
+    if df.empty or mapping.empty or "reaction_id" not in df.columns:
+        return df
+    cols = ["reaction_id"] + DONOR_MAPPING_COLUMNS
+    metadata = mapping[cols].drop_duplicates("reaction_id")
+    stale = [col for col in DONOR_MAPPING_COLUMNS if col in df.columns]
+    out = df.drop(columns=stale, errors="ignore").merge(
+        metadata,
+        on="reaction_id",
+        how="left",
+    )
+    canonical = out["canonical_status"].fillna("").astype(str).str.strip()
+    donor_mapped = out["donor_class"].fillna("").astype(str).str.strip().ne("")
+    out["independent_evidence"] = np.where(
+        donor_mapped,
+        canonical.eq("core"),
+        True,
+    )
+    non_independent = donor_mapped & ~out["independent_evidence"]
+    if "predictive_ranking_eligible" not in out.columns:
+        out["predictive_ranking_eligible"] = True
+    out.loc[non_independent, "predictive_ranking_eligible"] = False
+    if "decision_role" in out.columns:
+        out.loc[non_independent, "decision_role"] = "non_independent_model_alternative"
+    return out
 
 
 def apply_audited_mapping_coverage(
@@ -589,7 +755,12 @@ def apply_audited_mapping_coverage(
     if df.empty or coverage_audit.empty:
         return df
     out = df.copy()
-    coverage_map = coverage_audit.set_index("domain")["mapping_coverage_percent"].to_dict()
+    coverage_column = (
+        "effective_core_mapping_coverage_percent"
+        if "effective_core_mapping_coverage_percent" in coverage_audit.columns
+        else "mapping_coverage_percent"
+    )
+    coverage_map = coverage_audit.set_index("domain")[coverage_column].to_dict()
     out["coverage_audit_domain"] = out.apply(candidate_audit_domain, axis=1)
     audited = out["coverage_audit_domain"].map(coverage_map)
     current = pd.to_numeric(
@@ -670,9 +841,14 @@ def main() -> None:
             ~pathway_candidates["high_low_difference_source"].eq("product_demand_driven")
         ].sort_values(["priority_score", "confidence_score"], ascending=False)
 
+    mapping_path = os.path.join(ROOT, "data", "chompact_pathway_mapping.csv")
+    mapping_ontology = load_mapping_ontology(mapping_path)
+    reaction_candidates = attach_mapping_metadata(reaction_candidates, mapping_ontology)
+    demand_explanations = attach_mapping_metadata(demand_explanations, mapping_ontology)
+
     coverage_audit = make_domain_coverage_audit(
         results_dir(args.dataset, "tables"),
-        os.path.join(ROOT, "data", "chompact_pathway_mapping.csv"),
+        mapping_path,
         reaction_sep,
         reaction_candidates,
     )
@@ -700,7 +876,7 @@ def main() -> None:
 
     coverage_audit = make_domain_coverage_audit(
         results_dir(args.dataset, "tables"),
-        os.path.join(ROOT, "data", "chompact_pathway_mapping.csv"),
+        mapping_path,
         reaction_sep,
         reaction_candidates,
     )

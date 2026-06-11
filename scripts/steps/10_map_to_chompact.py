@@ -44,6 +44,13 @@ OPTIONAL_MAPPING_COLUMNS = [
     "is_product_related",
     "is_constraint_reaction",
     "priority_for_figures",
+    "donor_class",
+    "donor_metabolite",
+    "reaction_role",
+    "canonical_status",
+    "independent_evidence_group",
+    "glycan_relevance",
+    "mapping_guardrail",
 ]
 
 REACTION_ID_ALIASES = ["rxn_id", "reaction", "Reaction ID", "reactionID", "id"]
@@ -251,6 +258,16 @@ def attach_mapping(df: pd.DataFrame, mapping: pd.DataFrame, source_type: str) ->
     )
     for col in PROVENANCE_COLUMNS:
         out[col] = provenance[col]
+    mapping_guardrail = out.get(
+        "mapping_guardrail",
+        pd.Series("", index=out.index, dtype="string"),
+    ).fillna("").astype(str).str.strip()
+    has_mapping_guardrail = mapping_guardrail.ne("")
+    out.loc[has_mapping_guardrail, "interpretation_guardrail"] = (
+        out.loc[has_mapping_guardrail, "interpretation_guardrail"].astype(str).str.rstrip()
+        + " "
+        + mapping_guardrail.loc[has_mapping_guardrail]
+    )
     return out
 
 

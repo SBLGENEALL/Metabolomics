@@ -320,6 +320,7 @@ def save_priority_confidence(
         "pathway_family",
         "fva_source",
         "fva_scope",
+        "discovery_role",
         "annotation_display",
     ]
     for col in companion_columns:
